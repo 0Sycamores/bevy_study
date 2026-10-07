@@ -12,14 +12,13 @@
 
 | 文件 | 主题 | 去向 | 状态 |
 |---|---|---|---|
-| `008_message.rs` | `Message` 与 `EntityEvent` / 观察者 | → 新 012（已完成）/ 013 | 半吸收 |
 | `009_plugin.rs` | 插件、`PluginGroup`、用 `Without` 消除查询冲突 | → 新 016（`Without` 那部分已在 007 讲过） | 待吸收 |
 | `010_game.rs` | 综合小游戏 | → 新 031 `031_capstone_game.rs` | 待吸收 |
 
-> 已经吸收完毕、随后删除的有两个：
-> `006_input.rs`（→ 新 011，`pressed` vs `just_pressed` 连同"每秒 60 发"的坑都讲到了）、
-> `007_resource.rs`（→ 新 009，`Res`/`ResMut`/`init_resource`/`insert_resource` 全覆盖）。
-> 需要它们的话从 git 历史里取。
+> 已经吸收完毕、随后删除的有三个：
+> `006_input.rs`（→ 011）、`007_resource.rs`（→ 009）、
+> `008_message.rs`（→ 012 讲消息、013 讲观察者，两半都讲完了）。
+> 需要它们的话从 git 历史里取，或用 `git show <基线>:examples/008_message.rs`。
 
 ## 使用注意
 
