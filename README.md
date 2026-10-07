@@ -3,21 +3,23 @@
 用递进的小例子学习 **Bevy 0.19.1** 的 ECS 核心。
 每个例子都是一个可以单独运行的程序，建议按编号顺序看，并**亲手改一改再跑**。
 
-> ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](./CURRICULUM.md)：33 讲 / 7 个阶段（起步 → ECS 核心 → 事件与关系 → 组织与状态 → 2D 表现层 → 3D 与渲染 → 工程质量），编号会全部重排。
-> **本文档下方描述的仍是当前 `examples/` 里的旧 10 讲（旧编号）**，两者编号不对应，别混着看。旧 10 讲的内容在新规划中全部保留，对应关系见 `CURRICULUM.md` 第 5 节。
-
 - 引擎版本：`bevy = "0.19.1"`
 - Rust edition：`2024`（实测工具链 `rustc 1.99.0`）
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
+
+> ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
+> **当前进度：阶段一（001–004）已按新规划落地。**
+> `examples/` 里的 **005–010 仍是旧版**，编号与内容都还没有重排，`CURRICULUM.md` 第 5 节记录了它们的去向。
+> 也就是说：**001–004 看本文档下面的新说明，005–010 暂时按旧说明看**，两者编号体系不同。
 
 ---
 
 ## 运行方式
 
 ```bash
-# 运行某一个例子（编号就是文件名）
-cargo run --example 001_hello
-cargo run --example 010_game
+# 运行某一个例子
+cargo run --example 001_app
+cargo run --example 004_schedule
 
 # 开日志跑，方便观察系统执行情况
 RUST_LOG=info cargo run --example 008_message
@@ -43,80 +45,134 @@ cargo check --examples
 
 ## 课程表
 
-| # | 文件 | 主题 | 关键 API |
-|---|------|------|----------|
-| 001 | [001_hello.rs](examples/001_hello.rs) | App / 系统 / 调度标签 | `App::new`、`add_systems(Update, ..)`、`run` |
-| 002 | [002_sprite.rs](examples/002_sprite.rs) | 插件、相机、精灵 | `DefaultPlugins`、`Startup`、`Commands`、`Camera2d`、`Sprite` |
-| 003 | [003_system.rs](examples/003_system.rs) | 系统参数、时间 | `Res<Time>`、`delta_secs` |
-| 004 | [004_component.rs](examples/004_component.rs) | 自定义组件、实体生成 | `#[derive(Component)]`、元组 spawn、`Query<(&A, &mut B)>` |
-| 005 | [005_query.rs](examples/005_query.rs) | 查询过滤 | `With<T>` |
-| 006 | [006_input.rs](examples/006_input.rs) | 键盘输入 | `ButtonInput<KeyCode>`、`pressed` / `just_pressed` |
-| 007 | [007_resource.rs](examples/007_resource.rs) | 全局资源 | `#[derive(Resource)]`、`init_resource`、`Res` / `ResMut` |
-| 008 | [008_message.rs](examples/008_message.rs) | 消息与观察者 | `Message` / `MessageWriter` / `MessageReader`、`EntityEvent`、`On<E>`、`observe` |
-| 009 | [009_plugin.rs](examples/009_plugin.rs) | 插件与插件组 | `Plugin`、`PluginGroup`、`PluginGroupBuilder`、`Without<T>`、`is_changed` |
-| 010 | [010_game.rs](examples/010_game.rs) | 综合小游戏 | 上面全部 + `Timer` 冷却 + `.chain()` 顺序 + UI `Text` |
+| # | 文件 | 主题 | 状态 |
+|---|------|------|------|
+| 001 | [001_app.rs](examples/001_app.rs) | 最小 App：为什么它只跑一帧就退出 | ✅ 新规划 · 阶段一 |
+| 002 | [002_window.rs](examples/002_window.rs) | 窗口与相机：窗口 ≠ 画面 | ✅ 新规划 · 阶段一 |
+| 003 | [003_sprite.rs](examples/003_sprite.rs) | 精灵、坐标轴、层叠与必需组件 | ✅ 新规划 · 阶段一 |
+| 004 | [004_schedule.rs](examples/004_schedule.rs) | **系统执行顺序与顺序歧义检测** | ✅ 新规划 · 阶段一 |
+| 005 | [005_query.rs](examples/005_query.rs) | 查询过滤 | 🕗 旧版，待重排 → 新 006/007 |
+| 006 | [006_input.rs](examples/006_input.rs) | 键盘输入 | 🕗 旧版，待重排 → 新 011 |
+| 007 | [007_resource.rs](examples/007_resource.rs) | 全局资源 | 🕗 旧版，待重排 → 新 009 |
+| 008 | [008_message.rs](examples/008_message.rs) | 消息与观察者 | 🕗 旧版，待重排 → 新 012/013 |
+| 009 | [009_plugin.rs](examples/009_plugin.rs) | 插件与插件组 | 🕗 旧版，待重排 → 新 016 |
+| 010 | [010_game.rs](examples/010_game.rs) | 综合小游戏 | 🕗 旧版，待重排 → 新 031 |
 
 ---
 
-## 逐个说明
+## 逐个说明 · 阶段一（新规划）
 
-### 001_hello.rs —— 最小的 Bevy 程序
+### 001_app.rs —— 最小的 App，以及一个反直觉的事实
 
 ```rust
-App::new().add_systems(Update, hello_world).run();
+App::new()
+    .add_systems(Startup, say_hello)
+    .add_systems(Update, tick)
+    .run();
 ```
 
-- **观察点**：程序打印一次 `hello world!` 就退出了，**没有窗口**。
-  原因是这里没有加 `DefaultPlugins`，App 用的是默认 runner `run_once`——把调度跑一轮就结束。
-  一旦加上 `DefaultPlugins`（见 002），runner 会被 winit 事件循环接管，变成持续运行的窗口程序。
-- **要点**：`Update` 是「每帧执行」的调度标签；`App::new()` 已经带了主调度，所以 `Update` 会被执行。
+- **观察点**：程序打印三行就退出了，**没有窗口**：
 
-**练习**：再加一个打印系统，观察两条日志的先后顺序（它**不确定**，因为两个系统没有数据冲突，可能被并行执行）；
-想固定顺序就用 `.chain()`（见 008 和 010）。
+  ```text
+  [Startup] 整个 App 只跑这一次
+  [Update] 第 1 帧
+  —— .run() 已返回，进程结束 ——
+  ```
 
----
+  `Update` 号称「每帧跑一次」，可这里只跑了一次——**第 1 帧也是最后一帧**。
 
-### 002_sprite.rs —— 打开窗口，画出第一个方块
-
-- **观察点**：窗口出现，屏幕中央有一个蓝色竖条（高 1000，比窗口还高，所以顶到了上下边缘）。
 - **要点**：
-  - `DefaultPlugins` 是引擎的功能包（窗口、渲染、输入、时间……）。
-  - `Startup` 只在启动时跑一次，用来生成初始实体。
-  - `Commands` 是**延迟命令**：`spawn` 只是把命令排队，不会立刻生效。
-  - `Camera2d` 是 2D 相机；没有相机什么都看不见。
-- **注意**：文件里 `vec2(100.0, 1000.0)` 是调试时留下的尺寸（高 1000），改成 `Vec2::new(100.0, 100.0)` 就是一个正方形。
+  - 一个 Bevy 程序只有三件套：`App`（容器）、系统（普通函数，参数即依赖）、`Schedule`（挂在哪个时间点跑）。
+  - `App::new()` 其实就是 `App::default()`，而它内部调用了 `App::empty()`，那里把 runner 设成了 `run_once`（`bevy_app-0.19.1/src/app.rs:152`）。`run_once` 的实现只调用**一次** `app.update()`。
+  - 加上 `DefaultPlugins` 后，winit 会 `set_runner` 把 runner 换成事件循环，程序才会一直运行到关窗口。
+  - `Local<T>` 是**系统私有状态**：只属于这一个系统，跨帧保持。
+- **坑**：这里必须用 `println!` 而不是 `info!`。没有 `DefaultPlugins` 就没有 `LogPlugin`，没人安装 tracing 订阅者，`info!` 会被**静默丢弃**，终端上什么都看不到。
+- **实验**：去掉 `.add_plugins(DefaultPlugins)` 的注释再跑——会弹窗并永远运行，末尾那行 `println!` 再也不会执行。
 
-**练习**：生成 3 个不同颜色、不同位置的方块；把 `Startup` 改成 `Update`，看会发生什么（每帧都生成一个）。
+**练习**：再加一个 `Update` 打印系统，观察它和 `tick` 的先后顺序（**不确定**，两者无数据冲突，可能并行）。
 
 ---
 
-### 003_system.rs —— 系统就是一个普通函数
+### 002_window.rs —— 窗口与相机
 
-- **观察点**：控制台每帧打印一次两行内容，`Delta time` 在 0.016 左右浮动。
+- **观察点**：弹出一个 960×640、标题为「002 · 窗口与相机」的窗口，背景是偏蓝的深色。
 - **要点**：
-  - 系统就是函数，**参数即依赖**：写 `Res<Time>` 就自动注入时间资源。
-  - `(hello_system, count_system)` 是元组，一次性注册多个系统。
-  - `time.delta_secs()` 是上一帧到这一帧的秒数——**所有运动都要乘它**，否则速度快慢会跟着帧率变。
-- **注意**：这里没有 `DefaultPlugins` 之外的东西，但确实加了 `DefaultPlugins`，所以窗口会打开（只是没有相机，是黑的）。
+  - `DefaultPlugins` 是引擎的功能包（窗口、渲染、输入、时间、日志……），同时把 runner 换成事件循环。
+  - `DefaultPlugins.set(WindowPlugin { .. })` 用来覆盖其中某一个插件：这里设置了标题和初始分辨率。
+  - `ClearColor` 是一个 **Resource**，存「默认清屏色」。
+- **★ 这个例子最该做的实验**：把 `commands.spawn(Camera2d)` 注释掉再跑。
+  程序照常启动、窗口照常弹出、终端**不报任何错**，但窗口里什么都没有——**连 `ClearColor` 都不生效**。
+  因为清屏是**相机**的渲染流程干的，`ClearColor` 只是个默认值，没有相机就没人去清屏。
+  → 记住这条：**窗口 ≠ 画面**。以后遇到「窗口是黑的但不报错」，第一反应就查相机。
+- **扩展**（文件末尾有完整写法）：`WindowMode::BorderlessFullscreen(..)` 全屏；
+  `Camera { clear_color: ClearColorConfig::Custom(..) }` 给单台相机换清屏色。
+  注意区分 `ClearColor`（全局 Resource）与 `ClearColorConfig`（相机身上的字段）。
 
-**练习**：再加一个系统来打印 `time.elapsed_secs()`；
-把两个打印系统改成 `add_systems(Update, print_a).add_systems(Update, print_b)`，观察顺序是否还确定。
+**练习**：改成启动即全屏；再改成只有一台相机用黑色清屏。
 
 ---
 
-### 004_component.rs —— 组件：用数据描述实体
+### 003_sprite.rs —— 精灵、坐标轴、层叠
 
-- **观察点**：方块从左往右匀速移动（约 20 秒后移出屏幕）。
+- **观察点**：三个方块——中间红色（原始大小）、左上绿色（缩到 55% 并旋转 45°）、右下蓝色（横向拉长压扁）。
 - **要点**：
-  - `#[derive(Component)]` 让一个普通 struct 变成可以挂在实体上的组件。
-  - 元组 spawn `(Sprite, Transform, Player, Health)` = 给这个实体一次性挂上 4 个组件。
-  - `Query<(&Player, &mut Transform)>` 读 `Player`、写 `Transform`。
-  - `Health` 这里挂了但没用到（`#[allow(dead_code)]`）——它演示「实体可以带任意多组件」。
-  - `Sprite` 是 **required components** 的典型：挂 `Sprite` 会自动补上 `Transform` 和 `Visibility`。
+  - **Bevy 2D 的原点在窗口中心，x 向右、y 向上**。和大多数 2D 引擎「左上角为原点、y 向下」正好相反，先记住这条。
+  - `z` 决定谁在前：z 越大越靠前。2D 里的「旋转」是绕 z 轴转。
+  - `scale` 是 `Vec3`，2D 只用 x、y，z 保持 1.0。
+  - **必需组件**：只写 `Sprite` 也能跑，因为 `Sprite` 声明了自己需要 `Transform` 和 `Visibility`，引擎会自动补齐。这也解释了为什么你从来不用手写 `Visibility`。
+- **实验**：把绿色方块的 z 从 `1.0` 改成 `-1.0`，它会跑到红色后面去；把 y 取反，验证 y 轴朝上。
+  两个精灵 z 相同时谁在前面**没有保证**，要控制层叠就老实给不同的 z。
+- **关于画圆**：本讲的 `Sprite` 只能画矩形。想画圆/多边形要走 `Mesh2d` + `ColorMaterial`（不需要图片文件），等 027 讲 3D 时对比更清楚；用贴图则在 020。
 
-**练习**：用 `Health` 做一个「血量随时间下降」的系统（需要 `Res<Time>` 和 `Query<&mut Health>`）。
+**练习**：用若干方块拼一个雪人（身体、头、帽檐三层，z 依次递增）。
 
 ---
+
+### 004_schedule.rs —— 系统执行顺序（本阶段最重要的一讲）
+
+**观察点**：跑起来会看到一条 WARN，加上一份**明显算错的结算**：
+
+```text
+[new_wave]     第 1 波敌人来袭
+[check_death]  血量 5 > 0，还活着              ← 先判死，看到的还是旧血量
+[apply_damage] 受到 10 点伤害，剩余血量 -5      ← 后扣血，扣完其实已经死了
+[report]       —— 本帧结算：血量 -5，得分 0 ——  ← 血量 -5，却一分没加
+
+WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
+  1 pairs of systems with conflicting data access have indeterminate execution order.
+  Consider adding `before`, `after`, or `ambiguous_with` relationships ...
+   -- <Enable the debug feature to see the name> (in set Battle) and ... (in set Battle)
+```
+
+- **三句话版本**：
+  1. 元组里并列的系统默认**并行**。互不冲突时，谁先谁后观察不到差别。
+  2. 一旦两个系统访问同一份数据（一读一写、或都写），引擎会自动把它们**串行**，但**先后顺序仍然不做保证**——这叫**顺序歧义**。
+  3. 需要确定顺序必须**显式声明**：`.chain()` / `.before()` / `.after()` / `SystemSet`。
+- **要点**：
+  - 用 `edit_schedule(Update, |s| s.set_build_settings(ScheduleBuildSettings { ambiguity_detection: LogLevel::Warn, .. }))` **主动打开歧义检测**。建议自己项目里也开着。
+  - `#[derive(SystemSet)]` 给一组系统起名，`report.after(Battle)` 就能对**整组**声明顺序；以后往组里加系统不用改外面的声明。
+  - `.before()` / `.after()` 是**传递**的：A before B、B before C ⇒ A before C。
+  - 只有 `LogPlugin` 而没有 `DefaultPlugins` 时，App 仍然只跑一帧就退出（呼应 001），正好适合看这种一次性报告。
+- **⚠️ 最重要的认知**：**这个错误顺序是稳定的。** 实测连跑 5 次，`check_death` 每次都排在 `apply_damage` 前面。
+  Bevy 的调度在同一构建里通常表现一致，所以这类 bug **不会随机复现**——要么一直对、要么一直错，错的时候看起来还挺像「故意这么设计的」。
+  危险在于它**没有任何保证**：加一个系统、调一次注册顺序，就可能翻过来。
+  所以判断标准不是「我现在跑着是对的」，而是「我有没有显式声明顺序」。
+- **看不到系统名？** Bevy 默认把名字藏起来了（那几处 `<Enable the debug feature ...>`）。在 `Cargo.toml` 里打开即可：
+  ```toml
+  bevy = { version = "0.19.1", features = ["debug"] }
+  ```
+
+**实验（已实测有效）**：
+- 改 ①：`check_death.in_set(Battle).after(apply_damage)` → 得分变 `100`，WARN 消失。
+- 改 ②：`(new_wave, apply_damage, check_death).chain().in_set(Battle)` → 效果相同。
+
+**练习**：写一个 `sync_health_bar` 读 `Health`，故意和 `apply_damage` 产生歧义，然后分别用 `.after()` / `.before()` 修，观察「血条慢一帧」的现象。
+
+---
+
+## 逐个说明 · 旧版（005–010，待重排）
+
+> 下面这些例子**仍然是旧编号下的内容**，尚未按 `CURRICULUM.md` 重写。它们的说明与代码是对应的、可以直接跑。
 
 ### 005_query.rs —— 用过滤器挑出想要的实体
 
@@ -151,7 +207,7 @@ App::new().add_systems(Update, hello_world).run();
   - `#[derive(Resource)]` + `init_resource::<Score>()` 注册全局资源。
   - `Res<Score>` 只读，`ResMut<Score>` 可写，两者**不能同时存在于一个系统**。
   - 组件描述「有哪些实体」，资源描述「整个游戏共享的状态」（分数、配置、计时器……）。
-- **注意**：`add_score`（写）和 `show_score`（读）都访问 `Score`，所以调度器会把它们**串行**执行，但**谁先谁后是不确定的**——这种「系统顺序」问题在 010 里用 `.chain()` 解决。
+- **注意**：`add_score`（写）和 `show_score`（读）都访问 `Score`，所以调度器会把它们**串行**执行，但**谁先谁后是不确定的**——参见 004。
 
 **练习**：把 `add_score` 改成每 0.5 秒才加一次分（提示：用 `Res<Time>` 自己累加，或用 `Timer`）。
 
@@ -211,7 +267,7 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 (move_bullet, check_collision, update_score_display).chain(),
 ```
 
-  - `.chain()` 表示「按顺序执行」。不写的话，Bevy 只在**数据冲突**时才强制串行，顺序是它自己挑的。
+  - `.chain()` 表示「按顺序执行」。不写的话，Bevy 只在**数据冲突**时才强制串行，顺序是它自己挑的（详见 004）。
   - `shoot` 写消息、`spawn_bullet` 读消息：**写入者必须在前**，否则子弹要等下一帧才生成。
   - `check_collision` 改分、`update_score_display` 读分：顺序反了 UI 就会慢一帧。
   - 射速用 `FireCooldown(Timer)` 控制。如果用裸 `keyboard.pressed(Space)` 不加冷却，按住就是**每秒 60 发**。
@@ -221,7 +277,7 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 1. 把冷却从 0.15 秒改成 0.05 秒，感受射速变化。
 2. 让敌人被消灭后在随机位置重生，做成可以一直玩的循环。
 3. 加一个「敌人也会向玩家移动」的系统。
-4. 用 `States` 加一个「开始 / 游戏中 / 结束」的界面切换（这是当前课程的空白，见下）。
+4. 用 `States` 加一个「开始 / 游戏中 / 结束」的界面切换（在 031 会正式讲）。
 
 ---
 
@@ -231,23 +287,29 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 |------|------|
 | 控制台疯狂刷屏 | 在系统里无条件 `println!`。系统每帧都跑，用 `is_changed()` / `Timer` / `on_timer` 节流 |
 | 「按一次触发多次」 | 用了 `pressed`（按住每帧为真），应该用 `just_pressed` |
+| 结果算错但不报错、且稳定复现 | **顺序歧义**：两个系统抢同一份数据却没声明先后。开 `ambiguity_detection` 查（见 004） |
+| 某个系统完全没执行 | 系统参数获取失败（如资源没 `init_resource`）时，Bevy 会**静默跳过**该系统，不报错 |
 | 子弹/事件晚一帧生效 | 消息是双缓冲的，读取者必须排在写入者之后（`.chain()` / `.after()`） |
 | 编译报查询冲突 | 两个查询访问同一组件的读/写。用 `With` + `Without` 让编译器证明它们不相交 |
 | `commands.spawn` 之后立刻查不到 | 命令是延迟执行的，要到本帧末的同步点才生效 |
 | 移动速度随帧率变化 | 位移没乘 `time.delta_secs()` |
-| 什么都看不见 | 场景里没有相机（2D 需要 `Camera2d`） |
+| 什么都看不见 | 场景里没有相机（2D 需要 `Camera2d`）。窗口在、程序不报错、但画面空白 |
+| `info!` 什么都不打印 | 没装 `DefaultPlugins`（或 `LogPlugin`），没有 tracing 订阅者 |
 
 ---
 
-## 当前课程的缺口（待补）
+## 后续规划
 
-这 10 个例子覆盖了 ECS 的核心四件套（组件 / 查询 / 资源 / 消息）与插件，但下面这些 Bevy 的主要部分**还没有例子**，是后续扩展方向：
+完整课程规划见 [`CURRICULUM.md`](CURRICULUM.md)。七个阶段：
 
-- **States**：`States` / `OnEnter` / `OnExit`，做菜单、暂停、胜负切换
-- **定时逻辑**：`Timer` 只在 010 里被当作开火冷却用过，没有专门讲解计时器的几种写法
-- **系统调度进阶**：`SystemSet`、`.before()` / `.after()`、`run_if`、`on_timer`、`FixedUpdate`
-- **资产系统**：`AssetServer` 加载图片 / 音频 / 字体，`Handle<T>` 的用法
-- **表现层**：贴图与精灵图集、动画、UI 布局、`Gizmos` 调试绘制
-- **3D**：目前全是 2D
-- **工程化**：多文件模块拆分、`Result` 返回式系统与错误处理、ECS 单元测试（`app.update()` 驱动断言）
-- **调试工具**：`RUST_LOG` 分级、diagnostics overlay、`bevy_dev_tools` 检查器
+| 阶段 | 讲次 | 状态 |
+|------|------|------|
+| 一 · 起步（App / 窗口 / 精灵 / 调度） | 001–004 | ✅ 已完成 |
+| 二 · ECS 核心（组件 → 消息） | 005–012 | ⏳ 待做 |
+| 三 · 事件与关系（观察者 / 层级 / 变更检测） | 013–015 | ⏳ |
+| 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ⏳ |
+| 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |
+| 六 · 3D 与渲染（3D / glTF / 拾取 / 着色器） | 027–030 | ⏳ |
+| 七 · 工程质量（综合 / 测试 / 剖析发布） | 031–033 | ⏳ |
+
+旧 10 讲的内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
