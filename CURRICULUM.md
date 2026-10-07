@@ -48,11 +48,18 @@
 - **练习**：改成启动即全屏、背景改成指定颜色。
 - **吸收旧版**：从 `002_sprite.rs` 拆出窗口/相机部分。
 
-#### 003 `003_sprite.rs` — 第一个精灵
-- **目标**：生成实体、挂组件、被渲染。
-- **核心 API**：`commands.spawn((..))`、`Sprite::from_color(..)`、`Transform::from_xyz`、required components（`Sprite` 自动带 `Transform`/`Visibility`）。
-- **观察点**：坐标原点在屏幕中心，`y` 向上——和大多数 2D 库相反；spawn 两个重叠精灵看默认 `z` 顺序。
-- **练习**：用 `Transform` 的 `scale`/`rotation` 摆出三个不同姿态的方块。
+#### 003 `003_sprite.rs` — 第一个精灵 ✅ 已实现
+- **目标**：生成实体、挂组件、被渲染；**并把坐标系一次讲清**（本讲是 `Transform` 首次出现处）。
+- **核心 API**：`commands.spawn((..))`、`Sprite::from_color(..)`、`Transform::from_xyz`、`with_scale`/`with_rotation`、required components（`Sprite` 自动带 `Transform`/`Visibility`）。
+- **坐标系与手性**（实施时新增，原规划未包含）：Bevy 是**右手系 Y-up**，2D/3D 共用一套；
+  +X 右、+Y 上、+Z 指向观察者；与 Godot/Maya/OpenGL 一致，与 Unity 的 Z 轴相反。
+  引用对照图：<https://topkg.github.io/bevy-cheatbook/img/handedness.png>
+  （出处 <https://topkg.github.io/bevy-cheatbook/fundamentals/coords.html>，原图作者 @FreyaHolmer）。
+  同时点明 **UI 坐标是例外**（左上角原点、Y 向下），为 022 埋伏笔。
+- **观察点**：坐标原点在屏幕中心，`y` 向上；z 决定层叠（越大越靠前）。
+- **已验证的手性实验**：`Quat::from_rotation_z(+90°) * Vec3::X == Vec3::Y`（实测），
+  即右手系里绕 +Z 的正向旋转在屏幕上表现为**逆时针**。
+- **练习**：用 `Transform` 的 `scale`/`rotation` 摆出三个不同姿态的方块；拼一个雪人验证 z 层叠。
 - **吸收旧版**：`002_sprite.rs`（顺便清掉里面残留的 `vec2(100.0, 1000.0)` 和注释掉的死代码）。
 
 #### 004 `004_schedule.rs` — 系统执行顺序 ✅ 已实现
