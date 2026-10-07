@@ -188,26 +188,26 @@
 
 ### 阶段四 · 组织与状态（016–019）
 
-#### 016 `016_plugin.rs` — 插件
+#### 016 `016_plugin.rs` — 插件 ✅ 已实现
 - **目标**：把一组系统/资源/事件打包成可复用单元。
 - **核心 API**：`impl Plugin`（`build`/`finish`/`cleanup`）、`PluginGroup`、`PluginGroupBuilder`、`DefaultPlugins.set(..)`、`disable::<T>()`。
 - **观察点**：把 016 之前所有讲的系统收进自定义插件，`main` 里只剩插件列表；再演示 `DefaultPlugins` 的插件组结构（用 `RUST_LOG` 打印加载了哪些插件）。
 - **前置**：004、012。
 
-#### 017 `017_module.rs` — 多文件工程结构（目录式 example）
+#### 017 `017_module/` — 多文件工程结构（目录式 example） ✅ 已实现
 - **目标**：从"单文件例子"过渡到"能长大的工程"。
 - **形式**：本讲是**目录式 example**：`examples/017_module/main.rs` + `player.rs` + `enemy.rs` + `common.rs`。Cargo 会把 `examples/<name>/main.rs` 自动识别为名为 `<name>` 的 example（上游 bevy 仓库即用此模式）。
 - **核心 API**：`mod`/`pub use`、`prelude.rs` 汇总导出、`plugin` 与 `module` 的配合。
 - **观察点**：同名的 `PlayerPlugin` 分布在各自文件里，`main.rs` 只做组装；对比 016 的单文件版本，改动量集中在哪。
 - **前置**：016。
 
-#### 018 `018_states.rs` — 状态机
+#### 018 `018_states.rs` — 状态机 ✅ 已实现
 - **目标**：菜单 / 游戏中 / 暂停 / 结算 的流程控制。
 - **核心 API**：`#[derive(States)]`、`init_state::<T>()`、`OnEnter(S)`/`OnExit(S)`、`in_state(S)` 运行条件、`NextState<S>::set(..)`、`StateTransition` 调度。
 - **观察点**：`OnEnter` 只在进入的那一帧跑；`in_state` 的系统在状态外完全不执行（不是"执行了但提前 return"）。
 - **前置**：016。
 
-#### 019 `019_state_advanced.rs` — 状态进阶
+#### 019 `019_state_advanced.rs` — 状态进阶 ✅ 已实现
 - **目标**：复杂流程下的状态组合。
 - **核心 API**：`SubStates`（依附父状态存在）、`ComputedStates`（由其他状态推导）、`DespawnOnExit(S)`/`DespawnOnEnter(S)`/`DespawnWhen::new(..)`（0.19 的自动清理，旧名 `StateScoped` 已废弃）。
 - **观察点**：`DespawnOnExit` 挂上去之后，切状态时实体**自动**销毁，不用手写清理系统——顺手对比"手写 `OnExit` 清理"的写法有多啰嗦。
@@ -406,6 +406,11 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | `init_resource` 的语义 | **资源已存在时不覆盖**（实测 `insert(42)` 后再 `init` 仍是 42）；`insert_resource` 会覆盖，所以"重置资源"要用后者 | 009 |
 | `Stopwatch` 的位置 | **不在 prelude 里**，需要 `use bevy::time::Stopwatch;` | 010 |
 | 几个不在 prelude 的类型 | `Stopwatch` → `bevy::time::Stopwatch`；`AccumulatedMouseMotion` / `AccumulatedMouseScroll` → `bevy::input::mouse::{..}`；`Key` → `bevy::input::keyboard::Key`。用到时都要单独 `use` | 010 / 011 |
+| 状态机需要插件 | `StatesPlugin` 是状态机的前提（`DefaultPlugins` 内置）。只用 `LogPlugin` 时必须在 `init_state` 之前加上，否则 panic：`The StateTransition schedule is missing` | 018 / 019 |
+| 状态切换的生效时机 | `NextState::set(..)` 只是请求，切换发生在**帧末**的 `StateTransition` 调度里 —— 同一帧内 `State<S>` 仍是旧值，`OnExit(旧)` 先于 `OnEnter(新)`。`OnEnter` 里的 `commands.spawn` 还要再等一个同步点，所以"请求 → 看见成果"隔一两帧是正常的 | 018 / 019 |
+| 子状态不存在时读不到 | 父状态不满足时子状态**整个不存在**，`Res<State<子状态>>` 会 panic；必须用 `Option<Res<State<..>>>`。`NextState<子状态>` 同理 | 019 |
+| `init_state` 会触发一次 `OnEnter` | 即使"没有发生切换"，初始状态的 `OnEnter` 也会跑一次 —— 初始化的准备可以放心放进去 | 018 |
+| 目录式 example | `examples/<名字>/main.rs` 会被 Cargo 自动识别为名为 `<名字>` 的 example，同级子模块文件**不会**变成独立目标。已在本仓库用 `cargo metadata` 实测确认 | 017 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
@@ -421,7 +426,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | M1 阶段一 | 004 跑完，能口头解释"为什么两个系统写同一资源会串行但顺序不定" | ✅ 已完成（001–004 已落地并实跑验证） |
 | M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | ✅ 已完成（005–012 全部落地并实跑验证） |
 | M3 阶段三 | 015 跑完，能用观察者替代消息、说清变更检测省下了什么 | ✅ 已完成（013–015 全部落地并实跑验证） |
-| M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ⏳ |
+| M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ✅ 已完成（016–019 全部落地并实跑验证） |
 | M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ⏳ |
 | M6 阶段六 | 030 跑完，能加载 glTF 并写自定义 WGSL 材质 | ⏳ |
 | M7 阶段七 | 033 跑完，有一个可测试、可剖析、可发布的小游戏 | ⏳ |
@@ -473,3 +478,22 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 >   并引出 `set_if_neq`。
 > - 013 规格里的"观察者冒泡"（沿 `ChildOf` 向上传播）**没有现场演示** ——
 >   它是层级的能力，放进 013 会抢戏（规划原则第 8 条），故留在文末说明并指向 014。
+
+> 阶段四（016–019）的实施备注：
+> - 016 初版漏了跨插件的顺序声明，结果 `Score = 20` **加了却永远没打印出来**
+>   （整个演示只有 3 帧，错过就没了）。修法是引入 `GameSet` + `configure_sets`
+>   集中声明组间顺序 —— 这正好把 `SystemSet` 从"004 里提过一句"提升为**插件的必要配套**。
+> - 017 是本项目唯一的**目录式 example**，此前无法确认该模式在本仓库可行。
+>   实施时已实测：`cargo metadata` 显示 `017_module` 的来源是
+>   `examples/017_module/main.rs`，同级子模块未被识别为独立目标。
+>   017 的输出与 016 **逐字相同** —— 这正是本讲要证明的"只是搬了家"。
+> - 018 用计时器自动循环三个状态（不依赖输入），并明确了三条最容易搞混的规则：
+>   `set()` 是请求不是执行、`OnEnter`/`OnExit` 只跑一次、状态是资源不是组件。
+>   实测还发现 **`init_state` 也会触发一次 `OnEnter`**，已写进例子。
+> - 019 实测踩到两个坑，都写进了例子：① 状态机需要 `StatesPlugin`，
+>   只用 `LogPlugin` 会在 `init_state` 处 panic；② 读子状态必须用
+>   `Option<Res<State<..>>>`，因为父状态不满足时它**整个不存在**。
+>   另外状态切换在帧末生效，所以本讲用了 6 帧而不是 5 帧，否则看不到
+>   `DespawnOnExit` 的清理效果。
+> - 019 规格里的 `ComputedStates` **未现场演示**（与 `SubStates` 的演示目标重叠，
+>   按规划原则第 8 条留在文末说明）。

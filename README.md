@@ -8,7 +8,7 @@
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
 > ⚠️ **课程仍在推进中。** 完整规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一、二、三已完成（001–015）。**
+> **当前进度：阶段一~四已完成（001–019）。**
 
 ---
 
@@ -64,6 +64,10 @@ cargo check --examples
 | 013 | [013_observer.rs](examples/013_observer.rs) | 观察者与实体事件：精准投递、链式反应 |
 | 014 | [014_hierarchy.rs](examples/014_hierarchy.rs) | 父子层级：变换继承，只转父节点整棵树跟着动 |
 | 015 | [015_change_detection.rs](examples/015_change_detection.rs) | 变更检测：只对"变过的数据"干活 |
+| 016 | [016_plugin.rs](examples/016_plugin.rs) | 插件：把功能打包，用 `SystemSet` 声明跨插件顺序 |
+| 017 | [017_module/](examples/017_module/) | 多文件工程结构（**目录式 example**） |
+| 018 | [018_states.rs](examples/018_states.rs) | 状态机：`OnEnter` / `OnExit` / `in_state` |
+| 019 | [019_state_advanced.rs](examples/019_state_advanced.rs) | 状态进阶：子状态、`DespawnOnExit` 自动清理 |
 
 ---
 
@@ -410,6 +414,100 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ---
 
+### 016_plugin.rs —— 插件
+
+- **观察点**：三帧输出，分数只在敌人结算那一帧更新：
+
+  ```text
+  ═══ 第 1 帧 ═══
+     [分数插件] Score = 0
+  ═══ 第 2 帧 ═══
+  ═══ 第 3 帧 ═══
+     [敌人插件] 小兵甲 抵达终点，+10 分
+     [敌人插件] 小兵乙 抵达终点，+10 分
+     [分数插件] Score = 20
+  ```
+- **要点**：
+  - `Plugin::build` 里能做的，就是你在 `main` 里能做的一切 —— **插件不是新概念，只是把一段配置搬了个家**（从"堆在 main 里"变成"归属于某个功能模块"）。
+  - **`SystemSet` 是插件的必要配套**：插件之间同样要声明顺序。本讲那句 `GameSet::Score.after(GameSet::Enemy)` 是集中声明的跨插件约束；**不写的话，那一帧加的 `Score = 20` 永远不会被打印出来**（初版实测就是这么丢的）。
+  - 插件之间靠**共享资源 / 消息 / 事件**协作，不是互相调用 —— 代价是"谁拥有 `Score`"成了需要约定的问题，所以要在注释里写清归属。
+  - `PluginGroup` + `PluginGroupBuilder` 把多个插件打包；`DefaultPlugins.set(..)` / `.disable::<T>()` / `.add_before::<T>(..)` 用来定制引擎自带的插件组。
+  - 拆插件的判断标准：**如果你要为这组东西起个名词（"敌人"、"分数"、"音频"），它多半就该是个插件。**
+  - 第 1 帧那行 `Score = 0` 是"资源刚创建也算变过"（015 讲的 `Added` 是 `Changed` 的子集）。
+  - 一句话概括 `main`：**只剩一张插件清单。**
+
+---
+
+### 017_module —— 多文件工程结构
+
+- **形式**：本讲是**目录式 example** —— `examples/017_module/` 下有 `main.rs` + `common.rs` + `score.rs` + `enemy.rs`。
+  Cargo 会自动把 `examples/<名字>/main.rs` 识别成名为 `<名字>` 的 example，而**子模块文件不会**被当成独立 example。
+- **观察点**：输出与 016 **逐字相同**。这就是本讲要的效果：
+
+  ```text
+  ═══ 第 3 帧 ═══
+     [敌人插件] 小兵甲 抵达终点，+10 分
+     [敌人插件] 小兵乙 抵达终点，+10 分
+     [分数插件] Score = 20
+  ```
+- **要点**：
+  - `main.rs` 从"两百行实现"变成"三十行声明"——只做两件事：**装插件** + 声明**跨插件**的顺序约束。
+  - 三条值得照抄的约定：
+    1. **一个功能一个文件**，文件里就三样：专属资源 / 专属组件 / 那个插件。
+    2. **只 `pub` 出插件**，系统函数保持私有（本讲里 `report_score`、`check_arrival` 都没有 `pub`）。既是封装，也让"谁会用到这个函数"有唯一答案。
+    3. **共享的东西才进 `common`**，否则它会退化成新的"巨型 main"。
+  - ⚠️ **`mod` 与 `Plugin` 不是一回事**：`mod` 是 Rust 的模块系统（代码放哪、谁能看见），`Plugin` 是 Bevy 的组织方式（什么被注册进 App）。两者常一一对应，但**没有绑定关系**。
+  - ⚠️ `examples/` 下每个 example 都是**独立 crate**，所以 `use crate::common::..` 指的是**本 example 的** crate 根，与顶层 `src/` 无关。
+
+---
+
+### 018_states.rs —— 状态机
+
+- **观察点**：状态每 1.5 秒自动推进一圈，控制台打印进入/离开：
+
+  ```text
+  [OnEnter] Menu     背景变深蓝          ← 启动时也会跑一次
+  ── 请求切换到 Playing
+     [OnExit ] Menu
+     [OnEnter] Playing  背景变深绿，方块开始旋转
+  ── 请求切换到 GameOver
+     [OnExit ] Playing
+     [OnEnter] GameOver 背景变暗红，方块停转
+  ```
+- **要点**：
+  - ⚠️ **`set()` 是请求，不是执行**：切换发生在**帧末**的 `StateTransition` 调度里。所以同一帧内 `State<S>` 还是旧值，且 `OnExit(旧)` 一定排在 `OnEnter(新)` 之前。连调两次 `set()` 只有最后一次算数。
+  - ⚠️ **`OnEnter` / `OnExit` 只跑一次**（切换那一帧），不是"该状态下每帧"。每帧逻辑要用 `Update` + `in_state(..)`；用错的典型症状是"我的初始化只跑了一次"或"我的每帧逻辑压根没跑"。
+  - **`init_state` 注册完也会触发一次 `OnEnter`**，哪怕什么都没切过去 —— 初始状态的准备工作可以放心放进去。
+  - **状态是资源，不是组件**：全 App 一份 `State<AppState>`，描述的是"世界整体的阶段"；实体的状态该用组件（配合 015 的 `Changed`）。
+  - **状态 vs 布尔标志**：`States` 自带进出调度、现成的运行条件、以及引擎主动做好的变化检测。只要这个"阶段"**进出时有事要做**，就该用它。
+  - 画面：背景色随状态变化，黄色方块**只在 `Playing` 那 1.5 秒里转** —— 那就是 `in_state` 生效的肉眼证据。
+
+---
+
+### 019_state_advanced.rs —— 状态进阶
+
+- **观察点**：6 帧输出，三列走势把两件事一起讲清：
+
+  ```text
+  ═══ 第 1 帧 ═══   AppState=Menu     IsPaused=不存在   Progress=0  场景 ["菜单背景板"]
+  ═══ 第 2 帧 ═══   AppState=Menu     IsPaused=不存在   Progress=0  场景 ["菜单背景板"]
+  ═══ 第 3 帧 ═══   AppState=Playing  IsPaused=Running  Progress=1  场景 [背景板+道具甲乙丙]
+  ═══ 第 4 帧 ═══   AppState=Playing  IsPaused=Paused   Progress=1  场景 [同上]
+  ═══ 第 5 帧 ═══   AppState=Playing  IsPaused=Running  Progress=2  场景 [同上]
+  ═══ 第 6 帧 ═══   AppState=Menu     IsPaused=不存在   Progress=2  场景 ["菜单背景板"]
+  ```
+- **要点**：
+  - **`SubStates` 随父状态一起出现和消失**：Menu 阶段 `IsPaused` 显示 `不存在` —— 不是"值为空"，而是**整个状态没被创建**。它表达的正是"菜单里根本没有'是否暂停'这个概念"。
+    ⚠️ 所以读子状态必须用 `Option<Res<State<子状态>>>`；直接写 `Res<State<..>>` 在父状态不满足时会 panic。
+  - **暂停时逻辑真的停**：`Progress` 在 `Paused` 那一帧**原地不动**（被 `in_state(IsPaused::Running)` 挡住了）。`in_state` 用在子状态上和用在父状态上一样好使。
+  - **`DespawnOnExit(Playing)` 自动清理**：第 6 帧离开 `Playing` 时 3 个道具**自动消失，全程没人写过清理代码**。它把生命周期写在实体自己身上，不用维护一个"哪些实体该清"的集中查询（漏一个就泄漏一个）。
+    兄弟：`DespawnOnEnter(S)`（进入时销毁，适合清上轮残留）、`DespawnWhen::new(|transition| ..)`（自定义判断）。重复挂也不会报错。
+  - **`ComputedStates`** 由别的状态**推导**（`type SourceStates` + `fn compute`），没有自己的 `NextState`、不能直接切。适合"好几个状态下跑同一批逻辑"。本讲只在文末介绍，没现场演示。
+  - ⚠️ **时序**：第 2 帧请求切到 `Playing`，状态到第 3 帧才变；第 5 帧请求切回 `Menu`，第 6 帧才生效。原因是切换在帧末发生，且 `OnEnter` 里的 `commands.spawn` 还要再等一个同步点 —— 所以本讲用了 6 帧而不是 5 帧，否则看不到自动清理。
+  - ⚠️ **状态机需要 `StatesPlugin`**：`DefaultPlugins` 自带它，而本讲只装了 `LogPlugin`，所以显式加上了 —— 忘了会在 `init_state` 处直接 panic。
+
+---
+
 ## 常见坑速查
 
 | 现象 | 原因 |
@@ -430,6 +528,11 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 | 子实体没跟着动 / 位置算不对 | `Transform` 是**局部**的，世界坐标在只读的 `GlobalTransform`；且父的**缩放会逐级相乘**（见 014） |
 | despawn 一个节点后子树也没了 | 销毁父实体会**连带销毁整棵子树**（见 014） |
 | 观察者里的改动要等下一帧才生效 | `commands.trigger` 是延迟的，观察者在同步点才跑（见 013） |
+| 插件之间改了数据却看不到效果 | 跨插件的顺序也要显式声明：`SystemSet` + `configure_sets`（见 016） |
+| `init_state` 处 panic：`StateTransition schedule is missing` | 没装 `StatesPlugin`。`DefaultPlugins` 自带；只用 `LogPlugin` 时要显式补（见 019） |
+| 切换状态后当帧读到的还是旧状态 | `set()` 只是**请求**，切换在**帧末**的 `StateTransition` 里（见 018） |
+| 初始化"只跑了一次" / 每帧逻辑压根没跑 | `OnEnter` / `OnExit` 只在切换那一帧跑；每帧逻辑要用 `Update` + `in_state(..)`（见 018） |
+| 读子状态时 panic | 子状态不在时 `Res<State<子状态>>` 拿不到，得用 `Option<Res<State<..>>>`（见 019） |
 | `info!` 什么都不打印 | 没装 `DefaultPlugins`（或 `LogPlugin`），没有 tracing 订阅者 |
 
 ---
@@ -443,7 +546,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 | 一 · 起步（App / 窗口 / 精灵 / 调度） | 001–004 | ✅ 已完成 |
 | 二 · ECS 核心（组件 / 查询 / 过滤 / 命令 / 资源 / 时间 / 输入 / 消息） | 005–012 | ✅ 已完成 |
 | 三 · 事件与关系（观察者 / 层级 / 变更检测） | 013–015 | ✅ 已完成 |
-| 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ⏳ |
+| 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ✅ 已完成 |
 | 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |
 | 六 · 3D 与渲染（3D / glTF / 拾取 / 着色器） | 027–030 | ⏳ |
 | 七 · 工程质量（综合 / 测试 / 剖析发布） | 031–033 | ⏳ |
