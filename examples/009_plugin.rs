@@ -87,7 +87,11 @@ fn award_hit(
         return;
     };
     for mut enemy_transform in &mut enemy {
-        if enemy_transform.translation.distance(player_transform.translation) < 30.0 {
+        if enemy_transform
+            .translation
+            .distance(player_transform.translation)
+            < 30.0
+        {
             score.total += 10;
             let mirrored = -enemy_transform.translation;
             enemy_transform.translation = mirrored;
