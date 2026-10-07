@@ -9,8 +9,8 @@
 
 > ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
 > **当前进度：阶段一、二已落地（新编号 001–008）。**
-> `examples/` 里还混着几个**旧版例子**（`006_input`、`007_resource`、`008_message`、`009_plugin`、`010_game`），
-> 它们的编号与新规划冲突，正文里另列表说明。旧内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
+> 课程重排前的旧例子已移出 `examples/`，存档在 [`legacy_examples/`](legacy_examples/)（**不再参与编译**），
+> 只作参考。旧内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
 
 ---
 
@@ -22,7 +22,7 @@ cargo run --example 005_component
 cargo run --example 008_commands
 
 # 开日志跑，方便观察系统执行情况
-RUST_LOG=info cargo run --example 008_message
+RUST_LOG=info cargo run --example 005_component
 
 # 只做类型检查，不改动窗口
 cargo check --examples
@@ -54,15 +54,18 @@ cargo check --examples
 | 007 | [007_query_filter.rs](examples/007_query_filter.rs) | 过滤（`With`/`Without`/`Or`/`Has`）与借用冲突 |
 | 008 | [008_commands.rs](examples/008_commands.rs) | 命令的延迟执行与同步点 |
 
-## 旧版例子（待重排，编号会变）
+## 旧版例子（已移出，存档在 `legacy_examples/`）
+
+这些例子**不再是 cargo 目标**：`cargo run --example 006_input` 之类会报「没有这个目标」。
+文件放在 [`legacy_examples/`](legacy_examples/)，只作参考，说明见该目录的 `README.md`。
 
 | 文件 | 主题 | 去向 |
 |------|------|------|
-| [006_input.rs](examples/006_input.rs) | 键盘输入 | → 新 011 |
-| [007_resource.rs](examples/007_resource.rs) | 全局资源 | → 新 009 |
-| [008_message.rs](examples/008_message.rs) | 消息与观察者 | → 新 012/013 |
-| [009_plugin.rs](examples/009_plugin.rs) | 插件与插件组 | → 新 016 |
-| [010_game.rs](examples/010_game.rs) | 综合小游戏 | → 新 031 |
+| [006_input.rs](legacy_examples/006_input.rs) | 键盘输入 | → 新 011 |
+| [007_resource.rs](legacy_examples/007_resource.rs) | 全局资源 | → 新 009 |
+| [008_message.rs](legacy_examples/008_message.rs) | 消息与观察者 | → 新 012/013 |
+| [009_plugin.rs](legacy_examples/009_plugin.rs) | 插件与插件组 | → 新 016 |
+| [010_game.rs](legacy_examples/010_game.rs) | 综合小游戏 | → 新 031 |
 
 > 旧 `005_query.rs` 已被删除：它的内容（`With` 过滤）被新 [006_query.rs](examples/006_query.rs) 和
 > [007_query_filter.rs](examples/007_query_filter.rs) 完全吸收并展开了。
@@ -253,7 +256,9 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ## 逐个说明 · 旧版（待重排）
 
-> 下面这些例子**仍然是旧编号下的内容**，尚未按 `CURRICULUM.md` 重写。它们的说明与代码是对应的、可以直接跑。
+> 下面这些例子是**重排前的内容**，已移到 [`legacy_examples/`](legacy_examples/)，**不再是 cargo 目标**
+> （`cargo run --example 006_input` 会报「没有这个目标」）。说明与代码仍然对应，留作参考；
+> 想在当前仓库里跑一下，先 `git mv legacy_examples/006_input.rs examples/`。
 
 ### 006_input.rs —— 键盘输入
 
