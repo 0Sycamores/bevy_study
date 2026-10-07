@@ -2,15 +2,17 @@
 //!
 //! 运行：`cargo run --example 010_time`
 //!
-//! 本讲**只讲时间本身**，不碰移动方块之类的游戏逻辑：
+//! 新增概念
+//!   Time            这一帧过了多久（delta）、总共过了多久（elapsed）
+//!   Timer           计时器：Once 到点停住 / Repeating 周期触发
+//!   Stopwatch       秒表：只报"走了多久"，永不触发
+//!   Time<Virtual>   可暂停、可倍速的时钟 —— 系统里的 Res<Time> 拿到的就是它
 //!
-//!   一、`Time` 怎么读，`Timer` 的完整状态与**三种驱动写法**，`Stopwatch`
-//!   二、`Time<Virtual>`：暂停与倍速
+//! 使用场景
+//!   让运动 / 动画与帧率无关（每帧位移乘 delta_secs）；冷却、刷怪、自动存档
+//!   暂停游戏但 UI 继续动 —— 改 Time<Virtual>
 //!
-//! 为了看清"每帧走到哪儿"，第一段**不装 `TimePlugin`**，而是自己以固定帧长
-//! 推进（`app.update()` 逐帧调用，不调 `app.run()`）。
-//! 唯一例外是第二段 —— `Time<Virtual>` 必须由 `TimePlugin` 提供，
-//! 所以那一段换成 `MinimalPlugins` 并按真实时间走。两段各跑一个 App，原因见第二段。
+//! 注意：Once 到点后 is_finished() **每帧都为真**，要"触发一次"得用 just_finished()
 
 use bevy::log::LogPlugin;
 use bevy::prelude::*;

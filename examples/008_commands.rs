@@ -2,9 +2,15 @@
 //!
 //! 运行：`cargo run --example 008_commands`
 //!
-//! `Commands` 是 Bevy 里"排队等着的操作"。这一讲只讲清一件事：
-//! **你调用 `commands.spawn(..)` 的那一刻，实体并没有被创建。**
-//! 命令要等到下一个**同步点**(sync point)才真正落地。
+//! 新增概念
+//!   Commands       排队等着执行的操作：spawn / despawn / insert / remove
+//!   同步点         命令真正落地的地方：Schedule 末尾，或排序自动插入的 ApplyDeferred
+//!   ApplyDeferred  想手动控制落地时机，就显式写一个
+//!
+//! 使用场景
+//!   创建、销毁实体，或给实体增删改组件
+//!
+//! 注意：`spawn` 之后**立刻查询查不到** —— 命令还在队列里。不声明顺序，落地时机就不确定
 
 use bevy::log::LogPlugin;
 use bevy::prelude::*;

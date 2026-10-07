@@ -2,12 +2,17 @@
 //!
 //! 运行：`cargo run --example 011_input`
 //!
-//! 本讲**只讲输入本身**：输入从哪几个资源来、怎么查、以及"按下"的三种语义。
-//! 不涉及移动、射击之类的游戏逻辑 —— 那属于别的讲次。
+//! 新增概念
+//!   ButtonInput<KeyCode>      键盘，按**物理位置**匹配（W 就是 W 那个位置）
+//!   ButtonInput<Key>          键盘，按**实际字符**匹配（问号在哪个键上都算问号）
+//!   ButtonInput<MouseButton>  鼠标键
+//!   AccumulatedMouseMotion / AccumulatedMouseScroll   这一帧移动 / 滚动了多少
+//!   pressed / just_pressed / just_released            按住每帧 / 按下那帧 / 松开那帧
 //!
-//! 操作：移动鼠标看方块跟随（屏幕坐标 → 世界坐标换算）；按住左键变色；
-//! 按空格观察 `just_pressed` 与 `pressed` 的差别；按 `?` 或 `+` 体验 `Key` 与 `KeyCode`。
-//! 每秒会打印一行汇总。
+//! 使用场景
+//!   键盘移动用 KeyCode、符号快捷键用 Key；鼠标点击、视角旋转、滚轮缩放
+//!
+//! 注意："按一次做一件事"必须用 just_pressed；用 pressed 会变成**每秒帧率次**，且不报错
 
 use bevy::input::keyboard::Key;
 // 这两个也不在 prelude 里。
