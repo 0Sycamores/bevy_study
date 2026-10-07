@@ -55,6 +55,9 @@ fn main() {
                 //
                 // 只声明了它们都在 new_wave 之后，彼此之间是自由的。
                 check_death.in_set(Battle).after(new_wave),
+                // 正确的排列顺序
+                // check_death.in_set(Battle).after(apply_damage),
+
                 // report 要读最终结果，所以必须排在**整个 Battle 组**之后。
                 // 对 SystemSet 声明顺序，就等于对它里面所有系统声明顺序。
                 report.after(Battle),
@@ -99,7 +102,10 @@ fn check_death(hp: Res<Health>, mut score: ResMut<Score>) {
 }
 
 fn report(hp: Res<Health>, score: Res<Score>) {
-    println!("[report]       —— 本帧结算：血量 {}，得分 {} ——", hp.0, score.0);
+    println!(
+        "[report]       —— 本帧结算：血量 {}，得分 {} ——",
+        hp.0, score.0
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────
