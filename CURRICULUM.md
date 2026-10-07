@@ -107,14 +107,14 @@
 - **观察点**：在同一系统里 `spawn` 之后立刻 `query` 查不到——命令还没落地；把 spawn 和 query 拆成两个系统（或加 `.chain()`）就好了。这个"为什么查不到"是新手的第二大坑。
 - **前置**：005、007。
 
-#### 009 `009_resource.rs` — 资源
+#### 009 `009_resource.rs` — 资源 ✅ 已实现
 - **目标**：全局单例数据。
 - **核心 API**：`#[derive(Resource)]`、`init_resource`、`insert_resource`、`Res`/`ResMut`、`resource_exists` 运行条件。
 - **观察点**：访问未初始化的资源 → 参数获取失败 → 系统被**静默跳过**（不 panic）。用一条 `info!` 验证"系统根本没跑"。
 - **吸收旧版**：`007_resource.rs`。
 - **前置**：008。
 
-#### 010 `010_time.rs` — 时间与计时器
+#### 010 `010_time.rs` — 时间与计时器 ✅ 已实现
 - **目标**：帧率无关的逻辑，以及 `Timer` 的多种驱动写法。
 - **核心 API**：`Time`（`delta_secs`/`elapsed_secs`）、`Timer`/`TimerMode`/`Stopwatch`、`tick(Duration)`/`is_finished()`/`just_finished()`/`reset()`、`Time<Virtual>`、`Time<Fixed>`。
 - **内容安排**（本项目刚删掉的 `main.rs` 计时器内容在这里正式落地）：
@@ -125,14 +125,14 @@
 - **吸收旧版**：`003_system.rs` 的时间部分 + 已从 `src/main.rs` 删除的计时器示例。
 - **前置**：009。
 
-#### 011 `011_input.rs` — 键盘与鼠标输入
+#### 011 `011_input.rs` — 键盘与鼠标输入 ✅ 已实现
 - **目标**：拿输入驱动逻辑，分清"持续"和"瞬间"。
 - **核心 API**：`ButtonInput<KeyCode>`/`ButtonInput<MouseButton>`、`pressed`/`just_pressed`/`just_released`、`AccumulatedMouseMotion`、光标 → 世界坐标。
 - **观察点**：经典 bug 现场——用 `pressed` 做"按一次开一枪"，按住会变成每秒 60 发；换成 `just_pressed` + 冷却计时器才对。这正是旧版 `010_game.rs` 踩过的坑，在这里提前讲掉。
 - **吸收旧版**：`006_input.rs`。
 - **前置**：010。
 
-#### 012 `012_message.rs` — 消息（0.17 起由 Event 改名）
+#### 012 `012_message.rs` — 消息（0.17 起由 Event 改名） ✅ 已实现
 - **目标**：系统间解耦通信。
 - **核心 API**：`#[derive(Message)]`、`app.add_message::<T>()`、`MessageWriter::write`、`MessageReader::read`、`MessageMutator`、`MessageReader` 的双缓冲语义。
 - **观察点**：
@@ -380,6 +380,14 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | `Query` 遍历顺序 | **不是生成顺序**。Bevy 按原型(archetype)分组存储，遍历**逐组**进行，组间先后与生成时间无关，不可依赖 | 006 |
 | `Commands` 何时落地 | `ScheduleBuildSettings::auto_insert_apply_deferred` **默认为 `true`**：`.chain()` / `.after()` 会在"有延迟参数的系统 → 读相关数据的系统"这条边上自动插 `ApplyDeferred`。不声明顺序则落地时机不定（实测同帧内可查到 0 个）。`chain_ignore_deferred()` 只排序、不插同步点 | 008 |
 | `Has<T>` 的位置 | 它是**取数项**（写在元组里、返回 `bool`），**不是**过滤器；`With` / `Without` / `Or` 才是过滤器（写在第二个参数位置） | 007 |
+| `Time` / `Time<Real>` / `Time<Virtual>` | 系统里 `Res<Time>` 拿到的就是**虚拟时钟**。实测（每帧真实流逝 ~100ms）：正常 Time=Real=Virtual≈100ms；`pause()` 后 Time=Virtual=**0** 而 Real 仍 ≈100ms；`set_relative_speed(3.0)` 后 Time=Virtual≈**300ms**、Real≈100ms。暂停/慢动作只需改 `Time<Virtual>` | 010 |
+| 手动推进时间 | 不装 `TimePlugin` 时 `init_resource::<Time>()` + `Time::advance_by(dur)` 可精确控制（delta 即所给值）；**装了 `TimePlugin` 则手动 `advance_by(Time<Real>)` 会被插件覆盖**（实测无效） | 010 / 012 |
+| 无窗口多帧推进 | 直接 `app.update()` 循环即可，**不需要** `run()`，也不会因"插件还在构建"而 panic（实测） | 010 / 012 |
+| 消息的生命周期 | **双缓冲，只活两帧**：写在第 N 帧 → 第 N、N+1 帧可读 → 第 N+2 帧消失。实测一条只写一次的消息：读者排在前时第 1 帧读 0、第 2 帧读 1、第 3 帧读 0 | 012 |
+| 消息的读写顺序 | **Bevy 不会自动把 `MessageWriter` 排在 `MessageReader` 之前**（与常见的相反说法不符，实测读者会先跑）。不声明顺序就晚一帧生效，必须 `.chain()` / `.after()` | 012 |
+| `init_resource` 的语义 | **资源已存在时不覆盖**（实测 `insert(42)` 后再 `init` 仍是 42）；`insert_resource` 会覆盖，所以"重置资源"要用后者 | 009 |
+| `Stopwatch` 的位置 | **不在 prelude 里**，需要 `use bevy::time::Stopwatch;` | 010 |
+| `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
 - `Query` 命中 0 个**永远不会**导致系统被跳过；只有 `Single` 那一类才会。
@@ -410,7 +418,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | 里程碑 | 完成标志 | 状态 |
 |---|---|---|
 | M1 阶段一 | 004 跑完，能口头解释"为什么两个系统写同一资源会串行但顺序不定" | ✅ 已完成（001–004 已落地并实跑验证） |
-| M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | 🚧 进行中（005–008 已落地并实跑验证，剩 009–012） |
+| M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | ✅ 已完成（005–012 全部落地并实跑验证） |
 | M3 阶段三 | 015 跑完，能用观察者替代消息、说清变更检测省下了什么 | ⏳ |
 | M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ⏳ |
 | M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ⏳ |
@@ -440,3 +448,21 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 >   移动后它们**不再是 cargo 目标**，`cargo check --all-targets` 不再覆盖，
 >   可能随 Bevy 升级而失效且没有任何提示 —— 这是存档的代价。
 >   后续写到对应讲次时，把内容吸收进新文件，然后就地删除存档。
+
+> 阶段二（009–012）的实施备注：
+> - **009 与 010 是无窗口控制台，011 是窗口交互，012 是无窗口逐帧推进。**
+>   010/012 都用手动 `app.update()` 逐帧推进（见 4.5 的"无窗口多帧推进"），
+>   因为时间与消息都是**跨帧**机制，帧长不可控就看不清。
+> - `010_time.rs` 正面回答了那个被删掉的 `src/main.rs` 计时器内容的去处：
+>   `Timer` 的**三种写法**（手动累加 / 资源 / 组件）在同一讲里对照，
+>   并用"前 5 帧 100ms、后 5 帧 50ms"实测出帧率相关写法的 33% 误差。
+> - `010` 里 `Time<Virtual>` **没有现场演示**：它需要 `TimePlugin`，
+>   而该插件会覆盖手动推进的时间（4.5 已记录）。所以那一节只给结论和实测数字，
+>   并在注释里说明原因 —— 这是有意的取舍，不是漏写。
+> - `011_input.rs` 用"按住空格一秒"把经典 bug 量化了。实测（固定 60 帧 × 1/60 秒）：
+>   `just_pressed` 触发 **1** 次、`pressed` 触发 **60** 次 —— 那个 60 就是帧率。
+> - `012_message.rs` 实测纠正了一条流传很广的说法：
+>   **Bevy 并不会自动把 `MessageWriter` 排在 `MessageReader` 之前**。
+>   同帧同类型的两个读者，有序的读到本帧、无序的读到上一帧。消息**只活两帧**。
+> - 已吸收完毕并从 `legacy_examples/` 删除：`006_input.rs`（→ 011）、`007_resource.rs`（→ 009）。
+>   剩余 `008_message.rs`（等 013 讲完观察者那一半）、`009_plugin.rs`（等 016）、`010_game.rs`（等 031）。

@@ -8,9 +8,9 @@
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
 > ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一、二已落地（新编号 001–008）。**
-> 课程重排前的旧例子已移出 `examples/`，存档在 [`legacy_examples/`](legacy_examples/)（**不再参与编译**），
-> 只作参考。旧内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
+> **当前进度：阶段一、二已完成（新编号 001–012）。**
+> 重排前的旧例子大部分已被吸收删除，剩下三个存档在 [`legacy_examples/`](legacy_examples/)（**不再参与编译**），
+> 只作参考。对应关系见 `CURRICULUM.md` 第 5 节。
 
 ---
 
@@ -53,22 +53,27 @@ cargo check --examples
 | 006 | [006_query.rs](examples/006_query.rs) | 查询的几种写法 + 取不到数据会怎样 |
 | 007 | [007_query_filter.rs](examples/007_query_filter.rs) | 过滤（`With`/`Without`/`Or`/`Has`）与借用冲突 |
 | 008 | [008_commands.rs](examples/008_commands.rs) | 命令的延迟执行与同步点 |
+| 009 | [009_resource.rs](examples/009_resource.rs) | 资源：全局一份的数据；缺资源会 panic |
+| 010 | [010_time.rs](examples/010_time.rs) | 时间与计时器：帧率无关 + `Timer` 三种写法 |
+| 011 | [011_input.rs](examples/011_input.rs) | 键盘鼠标输入；`pressed` 的 60 倍陷阱 |
+| 012 | [012_message.rs](examples/012_message.rs) | 消息：只活两帧，顺序要自己声明 |
 
 ## 旧版例子（已移出，存档在 `legacy_examples/`）
 
-这些例子**不再是 cargo 目标**：`cargo run --example 006_input` 之类会报「没有这个目标」。
+这些例子**不再是 cargo 目标**：`cargo run --example 009_plugin` 之类会报「没有这个目标」。
 文件放在 [`legacy_examples/`](legacy_examples/)，只作参考，说明见该目录的 `README.md`。
 
-| 文件 | 主题 | 去向 |
-|------|------|------|
-| [006_input.rs](legacy_examples/006_input.rs) | 键盘输入 | → 新 011 |
-| [007_resource.rs](legacy_examples/007_resource.rs) | 全局资源 | → 新 009 |
-| [008_message.rs](legacy_examples/008_message.rs) | 消息与观察者 | → 新 012/013 |
-| [009_plugin.rs](legacy_examples/009_plugin.rs) | 插件与插件组 | → 新 016 |
-| [010_game.rs](legacy_examples/010_game.rs) | 综合小游戏 | → 新 031 |
+| 文件 | 主题 | 去向 | 状态 |
+|------|------|------|------|
+| [008_message.rs](legacy_examples/008_message.rs) | 消息与观察者 | → 新 012（已完成）/ 013 | 半吸收 |
+| [009_plugin.rs](legacy_examples/009_plugin.rs) | 插件与插件组 | → 新 016 | 待吸收 |
+| [010_game.rs](legacy_examples/010_game.rs) | 综合小游戏 | → 新 031 | 待吸收 |
 
-> 旧 `005_query.rs` 已被删除：它的内容（`With` 过滤）被新 [006_query.rs](examples/006_query.rs) 和
-> [007_query_filter.rs](examples/007_query_filter.rs) 完全吸收并展开了。
+> 已经**吸收完毕并删除**的旧文件：
+> `005_query.rs`（→ 新 006/007 的过滤部分）、
+> `006_input.rs`（→ 新 011）、
+> `007_resource.rs`（→ 新 009）。
+> 需要它们时从 git 历史里取，例如 `git show 21b0c91:examples/001_hello.rs`。
 
 ---
 
@@ -254,6 +259,78 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ---
 
+### 009_resource.rs —— 资源：全局一份的数据
+
+- **观察点**：控制台依次打印加分、乘倍率、最终得分；`report_optional` 报告一个**没注册**的资源；`skip_if_missing` 一行输出都没有。
+- **要点**：
+  - **组件 vs 资源**的判据就一句：这个数据是「每个实体各有一份」（组件），还是「全局只有一份」（资源）。敌人各自的血量是组件，玩家总分是资源。
+  - `init_resource::<T>()` 要求 `T: Default`；`insert_resource(v)` 自己给值。
+  - **实测差异**：`init_resource` 在资源**已存在时不会覆盖**（先 `insert(42)` 再 `init` 仍是 42）；`insert_resource` 会覆盖。所以「重置一个资源」要用后者。
+  - ⚠️ **缺 `Res<T>` 会直接 panic**，不是静默跳过。三种应对：`Option<Res<T>>`（自己处理 `None`）、`run_if(resource_exists::<T>)`（不存在就整系统跳过）、`If<Res<T>>`。
+  - 对比 006：`Query<&T>` 命中 0 个**永远**不会 panic。**资源缺失会炸，实体查询不会** —— 这个不对称要记牢。
+  - `gain_score` 和 `award_bonus` 都要 `ResMut<Score>`，会串行但顺序不保证（004 讲的），所以显式写了 `.after()`。
+
+---
+
+### 010_time.rs —— 时间与计时器
+
+- **观察点**：10 帧逐帧输出。前 5 帧每帧 100ms、后 5 帧切成 50ms —— 两个"移动者"的最终位置：
+
+  ```text
+  ── 第 10 帧   帧长  50ms   真实累计 0.75s
+          delta法= 75.0   定步法=100.0
+  ```
+
+  真实只过了 0.75 秒、速度 100/s，正确值就是 **75**。`delta法` 对，`定步法` **多了 33%**。
+- **要点**：
+  - **任何随时间变化的量（位移、缩放、冷却、动画进度）都必须乘 `delta_secs()`**，绝对不能按帧算。帧率一变，按帧算的写法就跟着变。
+  - **`Timer` 的三种写法**在同一讲里对照，且三种在同一帧触发（说明等价），选哪种看用途：
+    手动累加（最灵活、也最容易写错，要自己结转超出部分）/ `Timer` 资源（全局唯一的定时）/ `Timer` 组件（每个实体各自节奏）。另有 `Stopwatch`（只计时、不触发）。
+  - ⚠️ **`is_finished()` 对 `Once` 计时器到点后每帧都为真** —— 拿它做「触发一次」会变成每帧触发。要「只触发一次」就用 `just_finished()`。（输出里 `【Once + is_finished】` 那行从第 5 帧起一直刷，就是在演示这个坑。）
+  - `Res<Time>` 拿到的其实是**虚拟时钟**。实测：正常时 `Time = Real = Virtual`；`pause()` 后 `Time = Virtual = 0` 而 **`Real` 照走**；`set_relative_speed(3.0)` 后 `Time = Virtual ≈ 3×Real`。做暂停菜单改 `Time<Virtual>` 就够了。
+  - 本讲**不用** `DefaultPlugins`，而是手动 `app.update()` + `advance_by` 逐帧推进 —— 时间行为只有帧长可控时才看得清（装了 `TimePlugin` 反而会覆盖手动推进的时间）。
+
+---
+
+### 011_input.rs —— 键盘与鼠标输入
+
+- **操作**：**WASD** 移动方块；**按住空格**看射速统计；**鼠标左键**按住换色。
+- **观察点**：按住空格不放，终端每秒打印一行：
+
+  ```text
+  【最近 1 秒】just_pressed 触发   1 次    pressed 触发  60 次
+  【最近 1 秒】just_pressed 触发   0 次    pressed 触发  61 次
+  ```
+- **要点**：
+  - **`just_pressed` 只在按下的那一帧为真；`pressed` 在按住期间的每一帧都为真。**
+  - 用固定帧长精确复现了一遍（按住 60 帧 × 每帧 1/60 秒）：`just_pressed` 触发 **1** 次、`pressed` 触发 **60** 次 —— 那个 60 就是**帧率**。用 `pressed` 做「按一次做一件事」，等于让帧率决定游戏平衡，换台更快的机器射速就变了。
+  - 三种查询的分工：`pressed` 持续动作（移动、蓄力）/ `just_pressed` 单次动作（射击、跳跃）/ `just_released` 松手动作（蓄力释放）。
+  - `KeyCode` 按**物理位置**匹配 —— 移动键绑定用它；`Key` 按**实际字符**匹配（`Key::Character("?".into())`）—— 符号快捷键用它。
+  - 鼠标的连续输入是 `AccumulatedMouseMotion` / `AccumulatedMouseScroll`；光标位置来自 `Window::cursor_position()`，注意那是**左上角原点、Y 向下**的屏幕坐标（003 讲过的那套），要变世界坐标得过相机（025 讲）。
+  - 只把 `pressed` 换成 `just_pressed` 还不够：想「按住连续射击且射速固定」要用 **`just_pressed` 首发 + `Timer` 冷却接管**（010 的 `Timer`）。
+
+---
+
+### 012_message.rs —— 消息
+
+- **观察点**：手动逐帧推进 4 帧，每条输出都标出帧号。同帧、同类型的两个读者，读到的却不一样：
+
+  ```text
+  ═══ 第 2 帧 ═══
+     [晚一帧读者] 读到 [1]     ← 上一帧那条
+     [写] Heartbeat(2)
+     [有序读者]   读到 [2]     ← 本帧那条
+  ```
+- **要点**：
+  - ⚠️ **Bevy 不会自动把 `MessageWriter` 排在 `MessageReader` 之前。** 不声明顺序，读者就可能排在写者前面，表现就是消息**晚一帧**生效。必须 `.chain()` / `.after()` 明确顺序。
+  - **消息只活两帧**（双缓冲）：写在第 N 帧 → 第 N、N+1 帧可读 → 第 N+2 帧消失。没人读就自己丢弃，不会无限堆积。
+  - 所以消息适合**一次性通知**（受伤、死亡、得分、播音效），不适合长期状态（当前血量、是否暂停）—— 那些该用组件或资源。
+  - 三种角色：`MessageWriter`（只写）/ `MessageReader`（只读，**必须声明 `mut`**，它要跨帧记住读到哪儿）/ `MessageMutator`（同类型既读又写 —— 因为同类型的 Reader + Writer 会冲突）。
+  - **每个读者各自独立记录进度**，一条消息可以被任意多个系统消费。
+  - 消息是**全局广播**（谁都能读）；013 的观察者则是**精准投递到某个实体**。
+
+---
+
 ## 逐个说明 · 旧版（待重排）
 
 > 下面这些例子是**重排前的内容**，已移到 [`legacy_examples/`](legacy_examples/)，**不再是 cargo 目标**
@@ -345,15 +422,16 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 | 现象 | 原因 |
 |------|------|
 | 控制台疯狂刷屏 | 在系统里无条件 `println!`。系统每帧都跑，用 `is_changed()` / `Timer` / `on_timer` 节流 |
-| 「按一次触发多次」 | 用了 `pressed`（按住每帧为真），应该用 `just_pressed` |
+| 「按一次触发多次」 | 用了 `pressed`（按住每帧为真），应该用 `just_pressed`。实测按住一秒：`just_pressed` 1 次、`pressed` 60 次 = 帧率（见 011） |
 | 结果算错但不报错、且稳定复现 | **顺序歧义**：两个系统抢同一份数据却没声明先后。开 `ambiguity_detection` 查（见 004） |
 | 某个系统完全没执行，且毫无报错 | `Single` / `Option<Single>` / `Populated` 的条件不满足时，Bevy 会**静默跳过**整个系统（见 006） |
-| 一运行就 panic：`Resource does not exist` | 缺 `Res<T>` / `ResMut<T>`，资源没注册。用 `Option<Res<T>>` 自己处理，或用 `If<Res<T>>` 让系统跳过（见 006） |
+| 一运行就 panic：`Resource does not exist` | 缺 `Res<T>` / `ResMut<T>`，资源没注册。用 `Option<Res<T>>` 自己处理，或用 `If<Res<T>>` 让系统跳过（见 009） |
 | 一运行就 panic：`error[B0001]` | 同一系统里两个查询访问同一组件的读/写。这是**运行时**检查，编译能过。用 `Without<T>` 造互斥查询，或 `ParamSet`（见 007） |
 | 遍历顺序和生成顺序对不上 | Bevy 按**原型**分组存储，遍历逐组进行，组间顺序与生成时间无关。别依赖遍历顺序（见 006） |
 | `commands.spawn` 之后立刻查不到 | 命令是延迟执行的，要到同步点才生效（见 008） |
-| 子弹/消息晚一帧生效 | 消息是双缓冲的，读取者必须排在写入者之后（`.chain()` / `.after()`） |
-| 移动速度随帧率变化 | 位移没乘 `time.delta_secs()` |
+| 消息晚一帧才被读到 | **Bevy 不会自动把写者排在读者之前**，必须自己 `.chain()` / `.after()`；且消息双缓冲只活两帧（见 012） |
+| 定时器每帧都触发 | `Once` 计时器到点后 `is_finished()` **每帧都为真**，应该用 `just_finished()`（见 010） |
+| 移动速度随帧率变化 | 位移没乘 `time.delta_secs()`。实测帧长减半后，按帧算的写法会多走 33%（见 010） |
 | 什么都看不见 | 场景里没有相机（2D 需要 `Camera2d`）。窗口在、程序不报错、但画面空白 |
 | `info!` 什么都不打印 | 没装 `DefaultPlugins`（或 `LogPlugin`），没有 tracing 订阅者 |
 
@@ -366,7 +444,7 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 | 阶段 | 讲次 | 状态 |
 |------|------|------|
 | 一 · 起步（App / 窗口 / 精灵 / 调度） | 001–004 | ✅ 已完成 |
-| 二 · ECS 核心（组件 / 查询 / 过滤 / 命令 / 资源 / 时间 / 输入 / 消息） | 005–012 | 🚧 进行中（005–008 已落地） |
+| 二 · ECS 核心（组件 / 查询 / 过滤 / 命令 / 资源 / 时间 / 输入 / 消息） | 005–012 | ✅ 已完成 |
 | 三 · 事件与关系（观察者 / 层级 / 变更检测） | 013–015 | ⏳ |
 | 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ⏳ |
 | 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |
