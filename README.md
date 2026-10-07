@@ -8,9 +8,9 @@
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
 > ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一（001–004）已按新规划落地。**
-> `examples/` 里的 **005–010 仍是旧版**，编号与内容都还没有重排，`CURRICULUM.md` 第 5 节记录了它们的去向。
-> 也就是说：**001–004 看本文档下面的新说明，005–010 暂时按旧说明看**，两者编号体系不同。
+> **当前进度：阶段一、二已落地（新编号 001–008）。**
+> `examples/` 里还混着几个**旧版例子**（`006_input`、`007_resource`、`008_message`、`009_plugin`、`010_game`），
+> 它们的编号与新规划冲突，正文里另列表说明。旧内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
 
 ---
 
@@ -18,8 +18,8 @@
 
 ```bash
 # 运行某一个例子
-cargo run --example 001_app
-cargo run --example 004_schedule
+cargo run --example 005_component
+cargo run --example 008_commands
 
 # 开日志跑，方便观察系统执行情况
 RUST_LOG=info cargo run --example 008_message
@@ -37,28 +37,39 @@ cargo check --examples
 ## 怎么读这些例子
 
 每个例子都按「先跑起来看现象，再看代码」的顺序组织：现象写在**观察点**里，原理和踩坑写在**要点**里。
-例子里的参数（速度、颜色、过滤条件）都可以直接改，行为会随之变化；把 `pressed` 改成 `just_pressed`、把 `With` 去掉，也能立刻看到 Rust 编译器和 Bevy 的报错。
+例子里的参数（速度、颜色、过滤条件）都可以直接改，行为会随之变化；把 `pressed` 改成 `just_pressed`、把 `With` 去掉，也能立刻看到 Bevy 的报错。
 
 ---
 
-## 课程表
+## 课程表（新规划）
 
-| # | 文件 | 主题 | 状态 |
-|---|------|------|------|
-| 001 | [001_app.rs](examples/001_app.rs) | 最小 App：为什么它只跑一帧就退出 | ✅ 新规划 · 阶段一 |
-| 002 | [002_window.rs](examples/002_window.rs) | 窗口与相机：窗口 ≠ 画面 | ✅ 新规划 · 阶段一 |
-| 003 | [003_sprite.rs](examples/003_sprite.rs) | 精灵、坐标系与手性、层叠、必需组件 | ✅ 新规划 · 阶段一 |
-| 004 | [004_schedule.rs](examples/004_schedule.rs) | **系统执行顺序与顺序歧义检测** | ✅ 新规划 · 阶段一 |
-| 005 | [005_query.rs](examples/005_query.rs) | 查询过滤 | 🕗 旧版，待重排 → 新 006/007 |
-| 006 | [006_input.rs](examples/006_input.rs) | 键盘输入 | 🕗 旧版，待重排 → 新 011 |
-| 007 | [007_resource.rs](examples/007_resource.rs) | 全局资源 | 🕗 旧版，待重排 → 新 009 |
-| 008 | [008_message.rs](examples/008_message.rs) | 消息与观察者 | 🕗 旧版，待重排 → 新 012/013 |
-| 009 | [009_plugin.rs](examples/009_plugin.rs) | 插件与插件组 | 🕗 旧版，待重排 → 新 016 |
-| 010 | [010_game.rs](examples/010_game.rs) | 综合小游戏 | 🕗 旧版，待重排 → 新 031 |
+| # | 文件 | 主题 |
+|---|------|------|
+| 001 | [001_app.rs](examples/001_app.rs) | 最小 App：为什么它只跑一帧就退出 |
+| 002 | [002_window.rs](examples/002_window.rs) | 窗口与相机：窗口 ≠ 画面 |
+| 003 | [003_sprite.rs](examples/003_sprite.rs) | 精灵、坐标系与手性、层叠、必需组件 |
+| 004 | [004_schedule.rs](examples/004_schedule.rs) | **系统执行顺序与顺序歧义检测** |
+| 005 | [005_component.rs](examples/005_component.rs) | 组件：挂在实体上的数据 |
+| 006 | [006_query.rs](examples/006_query.rs) | 查询的几种写法 + 取不到数据会怎样 |
+| 007 | [007_query_filter.rs](examples/007_query_filter.rs) | 过滤（`With`/`Without`/`Or`/`Has`）与借用冲突 |
+| 008 | [008_commands.rs](examples/008_commands.rs) | 命令的延迟执行与同步点 |
+
+## 旧版例子（待重排，编号会变）
+
+| 文件 | 主题 | 去向 |
+|------|------|------|
+| [006_input.rs](examples/006_input.rs) | 键盘输入 | → 新 011 |
+| [007_resource.rs](examples/007_resource.rs) | 全局资源 | → 新 009 |
+| [008_message.rs](examples/008_message.rs) | 消息与观察者 | → 新 012/013 |
+| [009_plugin.rs](examples/009_plugin.rs) | 插件与插件组 | → 新 016 |
+| [010_game.rs](examples/010_game.rs) | 综合小游戏 | → 新 031 |
+
+> 旧 `005_query.rs` 已被删除：它的内容（`With` 过滤）被新 [006_query.rs](examples/006_query.rs) 和
+> [007_query_filter.rs](examples/007_query_filter.rs) 完全吸收并展开了。
 
 ---
 
-## 逐个说明 · 阶段一（新规划）
+## 逐个说明 · 阶段一
 
 ### 001_app.rs —— 最小的 App，以及一个反直觉的事实
 
@@ -127,7 +138,7 @@ App::new()
 
 ---
 
-### 004_schedule.rs —— 系统执行顺序（本阶段最重要的一讲）
+### 004_schedule.rs —— 系统执行顺序（阶段一最重要的一讲）
 
 **观察点**：跑起来会看到一条 WARN，加上一份**明显算错的结算**：
 
@@ -166,19 +177,83 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ---
 
-## 逐个说明 · 旧版（005–010，待重排）
+## 逐个说明 · 阶段二
 
-> 下面这些例子**仍然是旧编号下的内容**，尚未按 `CURRICULUM.md` 重写。它们的说明与代码是对应的、可以直接跑。
+### 005_component.rs —— 组件：挂在实体上的数据
 
-### 005_query.rs —— 用过滤器挑出想要的实体
-
-- **观察点**：深色方块（Player）向右移动，红色方块（Enemy）不动；控制台每帧打印敌人坐标。
+- **观察点**：蓝色、绿色两个方块持续向右移动且**速度不同**；红色方块**原地不动**，颜色由红逐渐变暗、再回满、循环。
 - **要点**：
-  - `Query<&mut Transform, With<Player>>`：第一个参数是「取什么数据」，第二个是「过滤条件」。
-  - `With<T>` = 只匹配拥有 `T` 的实体（不读取 `T` 本身）。对应的还有 `Without<T>`。
-  - 同样的 `Transform` 组件，靠过滤器区分出了两种角色。
+  - **两种组件**：**标记组件**（无字段，只当标签，如 `Player` / `Enemy`）和**数据组件**（每个实体各存一份，如 `Speed(f32)` / `Health(f32)`）。
+  - **实体 = 一组组件**。`spawn` 时给什么组件，这个实体就「是什么」。
+  - **查询按组件组合筛选**：`Query<(&Speed, &mut Transform), With<Player>>` —— 元组是要读写的**数据**，第二个参数是**过滤器**。
+  - 红方块不动就是核心证据：它的 `Transform` 组件明明也在，但没有 `Player` 标记就**不会被命中**。查询匹配的是「组件组合」，不是「某一个组件」。
+  - 一个实体上同一种组件**只能有一份**；`derive(Component)` 的类型必须 `Send + Sync + 'static`。
+  - 查询命中 0 个完全正常：系统照常运行、不会被跳过（对比 006 的 `Single`）。
+  - 这里的 `Health` 是**真正被使用**的（跑起来能看到颜色随之变化），不像旧版 004 里挂了却没用。
+- **布局**：窗口 960×640；方块的坐标和 `Speed` 值都写在 `setup` 里，可直接改。
 
 ---
+
+### 006_query.rs —— 查询的几种写法 + 取不到数据会怎样
+
+- **观察点**：控制台依次打印遍历结果、`single()` 命中、`Single` 参数命中、`Populated` 计数。
+  **注意「写法⑤」一行输出都没有** —— 它被静默跳过了。
+- **要点**：
+  - **取数方式对照**：`iter()` / `iter_mut()` / `par_iter_mut()` / `single()`（返回 `Result`）/ `get(entity)` / `iter_many()`，
+    以及三个「取不到就不跑系统」的参数：`Single` / `Option<Single>` / `Populated`。
+  - **取不到数据时 Bevy 的三种反应（0.19.1 实测）**：
+    1. `Query` 命中 0 个 → 完全正常，系统照常运行，`iter().count()` 得 0；
+    2. `Single` / `Option<Single>` / `Populated` 条件不满足 → **静默跳过整个系统**（不打印、不报错、不 panic）；
+    3. 缺 `Res<T>`（资源压根没注册）→ **直接 panic**，报 `Resource does not exist`，并提示用 `Option<Res<T>>` 或 `If<Res<T>>`。
+    一句话：**实体查询不匹配只会空手而归，资源缺失会当场炸掉。**
+  - ⚠️ **遍历顺序不是生成顺序**。Bevy 按**原型(archetype)**分组存储：组件组合相同的实体放在一起，遍历是**逐组**进行的，组间先后与生成时间无关。
+    所以生成顺序是「玩家A、玩家B、敌人」，打印出来敌人却排在最前面。**永远不要依赖 `Query` 的遍历顺序**——需要固定次序就收集成 `Vec` 再显式排序。
+    （「按原型存储」正是 Bevy 查询快的原因：同一原型的组件在内存里连续排列，遍历时缓存友好。顺序不可依赖是它付出的代价。）
+
+---
+
+### 007_query_filter.rs —— 过滤与借用冲突
+
+- **观察点**：控制台打印敌人镜像前后的坐标、`Or` 命中的 3 个战斗单位、`Has<Health>` 的逐个探测（石柱为 `false`）、`&Health` 的实际数值、`Without` 单独挑出的石柱。
+- **要点**：
+  - **过滤器分工**：`With<T>`（必须有 T，但**不读**数据）/ `Without<T>`（必须没有 T）/ `Or<(..)>`（任一满足即可）。
+    它们写在查询的**第二个参数位置**。
+  - **`Has<T>` 写在元组里**，返回 `bool`，用来顺便问一句「有没有」，且不关心具体数值。
+    如果只是「有才处理」，直接写 `&Health` 就够了——没有该组件的实体根本不会命中。
+  - **借用冲突**：同一系统里两个查询都碰 `Transform`（一个读、一个写）时会冲突。
+  - ⚠️ **这个冲突是运行时 panic（错误码 `B0001`），不是编译错误** —— `cargo check` 照样通过，一运行才炸：
+    ```text
+    error[B0001]: Query<...> in system ... accesses component(s) ... in a way
+    that conflicts with a previous system parameter.
+    Consider using `Without<T>` to create disjoint Queries or merging
+    conflicting Queries into a `ParamSet`.
+    ```
+    报错信息自己给了两种修法：① `Without<T>` 造互斥查询（本讲用的）；② `ParamSet` 把冲突查询合并，同一时刻只借出一种。
+  - **为什么 Bevy 不认「数学上的不相交」**：一个实体可以同时拥有 `Player` 和 `Enemy`（比如被策反的敌人），所以 `With<Player>` 与 `With<Enemy>` 本身并不互斥。只有显式写 `Without<Player>`，它才敢认定两者不相交。
+  - `Without` 在本讲出现两次：一次是**为了让代码能跑**（消除冲突），一次是**纯粹当过滤条件**（挑出石柱）。
+
+---
+
+### 008_commands.rs —— 命令的延迟执行
+
+- **观察点**：六步流水线依次打印。核心是第一步里的 `0 → 0` —— 排队了 3 个 `spawn`，立刻再查仍然是 0 个。
+- **要点**：
+  - `Commands` 内部是一份**命令队列**：`spawn` / `insert` / `remove` / `despawn` 全都只是写进队列，到**同步点**才被逐条执行。
+  - **同步点有两个来源**：
+    1. 一个 Schedule 跑完时（整个 `Update` 结束时、`Startup` 结束时……）；
+    2. **排序**把「带延迟参数的系统」排在「会读相关数据的系统」之前时，自动插入一个 `ApplyDeferred`。
+       这由 `ScheduleBuildSettings::auto_insert_apply_deferred` 控制，**默认就是 `true`**。
+  - **实测对比**：把 `.chain()` 去掉（写成 `(spawn_enemies, count_enemies)`），`count_enemies` 会打印 **0 个** —— 不声明顺序，命令什么时候生效就不确定，又是 004 讲的顺序问题。
+  - **控制同步点三法**：`.chain()`（排序 + 自动插同步点）、`.chain_ignore_deferred()`（只排序、**不**插）、显式写 `ApplyDeferred`：
+    `(spawn_enemies, ApplyDeferred, count_enemies).chain()`。
+  - **常用操作**：`commands.spawn(..)` / `commands.entity(e).insert(..)` / `.remove::<T>()` / `.despawn()` / `commands.get_entity(e)`（返回 `Option`，实体已不存在时是 `None` 而不是 panic）。
+  - **回看 005**：`Startup` 里 spawn 的东西 `Update` 能查到，正是因为 Startup 这个 Schedule 跑完时产生了一次同步点。这不是特例，正是上面第 1 条规则在起作用。
+
+---
+
+## 逐个说明 · 旧版（待重排）
+
+> 下面这些例子**仍然是旧编号下的内容**，尚未按 `CURRICULUM.md` 重写。它们的说明与代码是对应的、可以直接跑。
 
 ### 006_input.rs —— 键盘输入
 
@@ -187,7 +262,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - `Res<ButtonInput<KeyCode>>` 读取键盘状态。
   - `pressed(..)` = 按住期间**每帧**为真；`just_pressed(..)` = 只在**按下的那一帧**为真。
     这是最容易搞混的一点：用 `pressed` 做「按一次触发一次」的事情会变成每帧触发。
-  - 这里生成玩家时**没写 `Transform`**，但 `move_player` 照样能查到它——因为 `Sprite` 自动补齐了 `Transform`（required components）。
+  - 这里生成玩家时**没写 `Transform`**，但 `move_player` 照样能查到它——因为 `Sprite` 自动补齐了 `Transform`（required components，见 003）。
 
 ---
 
@@ -197,7 +272,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 - **要点**：
   - `#[derive(Resource)]` + `init_resource::<Score>()` 注册全局资源。
   - `Res<Score>` 只读，`ResMut<Score>` 可写，两者**不能同时存在于一个系统**。
-  - 组件描述「有哪些实体」，资源描述「整个游戏共享的状态」（分数、配置、计时器……）。
+  - 组件描述「有哪些实体」（见 005），资源描述「整个游戏共享的状态」（分数、配置、计时器……）。
 - **注意**：`add_score`（写）和 `show_score`（读）都访问 `Score`，所以调度器会把它们**串行**执行，但**谁先谁后是不确定的**——参见 004。
 
 ---
@@ -213,7 +288,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 - **观察点**：按空格 → 先打印 `Sent:`，再打印 `Received: ... total = 100`。
   按 K → 先打印 `Triggered:`，**然后**才是观察者里的 `Entity died!`。
-  后者的顺序体现了 `commands.trigger` 是**延迟执行**的（命令在帧末统一生效）。
+  后者的顺序体现了 `commands.trigger` 是**延迟执行**的（命令在同步点统一生效，见 008）。
 - **要点**：
   - `add_message::<PlayerDied>()` 注册消息类型。
   - `MessageWriter::write` 写入，`MessageReader::read` 消费。
@@ -232,7 +307,8 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - **插件之间通过共享资源协作**：`Score` 由 `ScorePlugin` 拥有，`EnemyPlugin` 里的 `award_hit` 去写它。
   - `is_changed()` 只在资源**被修改过**的那一帧返回 true，用它做日志就不会每帧刷屏。
   - `Without<Player>` 的作用：`award_hit` 里同时有「读玩家的 Transform」和「写敌人的 Transform」，
-    必须让编译器能证明这两个查询**互不相交**，否则会报查询冲突。`With<Player>` + `Without<Player>` 就构成了这个证明。
+    必须加上 `Without<Player>` 才能让 Bevy 认定两个查询**互不相交**，否则会触发 `B0001` 冲突。
+    ⚠️ 这个检查在**运行时**（详见 007）。
 - **注意**：相机是用裸 `add_systems(Startup, setup_common)` 注册的，没放进插件里——留作对比。
 
 ---
@@ -266,10 +342,12 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 | 控制台疯狂刷屏 | 在系统里无条件 `println!`。系统每帧都跑，用 `is_changed()` / `Timer` / `on_timer` 节流 |
 | 「按一次触发多次」 | 用了 `pressed`（按住每帧为真），应该用 `just_pressed` |
 | 结果算错但不报错、且稳定复现 | **顺序歧义**：两个系统抢同一份数据却没声明先后。开 `ambiguity_detection` 查（见 004） |
-| 某个系统完全没执行 | 系统参数获取失败（如资源没 `init_resource`）时，Bevy 会**静默跳过**该系统，不报错 |
-| 子弹/事件晚一帧生效 | 消息是双缓冲的，读取者必须排在写入者之后（`.chain()` / `.after()`） |
-| 编译报查询冲突 | 两个查询访问同一组件的读/写。用 `With` + `Without` 让编译器证明它们不相交 |
-| `commands.spawn` 之后立刻查不到 | 命令是延迟执行的，要到本帧末的同步点才生效 |
+| 某个系统完全没执行，且毫无报错 | `Single` / `Option<Single>` / `Populated` 的条件不满足时，Bevy 会**静默跳过**整个系统（见 006） |
+| 一运行就 panic：`Resource does not exist` | 缺 `Res<T>` / `ResMut<T>`，资源没注册。用 `Option<Res<T>>` 自己处理，或用 `If<Res<T>>` 让系统跳过（见 006） |
+| 一运行就 panic：`error[B0001]` | 同一系统里两个查询访问同一组件的读/写。这是**运行时**检查，编译能过。用 `Without<T>` 造互斥查询，或 `ParamSet`（见 007） |
+| 遍历顺序和生成顺序对不上 | Bevy 按**原型**分组存储，遍历逐组进行，组间顺序与生成时间无关。别依赖遍历顺序（见 006） |
+| `commands.spawn` 之后立刻查不到 | 命令是延迟执行的，要到同步点才生效（见 008） |
+| 子弹/消息晚一帧生效 | 消息是双缓冲的，读取者必须排在写入者之后（`.chain()` / `.after()`） |
 | 移动速度随帧率变化 | 位移没乘 `time.delta_secs()` |
 | 什么都看不见 | 场景里没有相机（2D 需要 `Camera2d`）。窗口在、程序不报错、但画面空白 |
 | `info!` 什么都不打印 | 没装 `DefaultPlugins`（或 `LogPlugin`），没有 tracing 订阅者 |
@@ -283,7 +361,7 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 | 阶段 | 讲次 | 状态 |
 |------|------|------|
 | 一 · 起步（App / 窗口 / 精灵 / 调度） | 001–004 | ✅ 已完成 |
-| 二 · ECS 核心（组件 → 消息） | 005–012 | ⏳ 待做 |
+| 二 · ECS 核心（组件 / 查询 / 过滤 / 命令 / 资源 / 时间 / 输入 / 消息） | 005–012 | 🚧 进行中（005–008 已落地） |
 | 三 · 事件与关系（观察者 / 层级 / 变更检测） | 013–015 | ⏳ |
 | 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ⏳ |
 | 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |

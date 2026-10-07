@@ -77,7 +77,9 @@ fn move_enemy(
 
 /// 玩家撞到敌人就得 10 分，并把敌人镜像到对角，方便反复触发。
 /// 这里同时用到 `With` / `Without`：只有加入 `Without<Player>`，
-/// 借用检查才能证明两个查询访问的 Transform 互不相交（读 vs 写）。
+/// Bevy 才认定两个查询访问的 Transform 互不相交（读 vs 写）。
+/// ⚠️ 这个检查发生在**运行时**（系统首次执行时 panic，错误码 B0001），
+/// 不是编译期 —— 编译通过不代表查询没问题。详见 007。
 fn award_hit(
     player: Query<&Transform, With<Player>>,
     mut enemy: Query<&mut Transform, (With<Enemy>, Without<Player>)>,

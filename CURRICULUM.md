@@ -82,26 +82,26 @@
 
 ### 阶段二 · ECS 核心（005–012）
 
-#### 005 `005_component.rs` — 组件与查询
+#### 005 `005_component.rs` — 组件与查询 ✅ 已实现
 - **目标**：自定义组件，读写组件数据。
 - **核心 API**：`#[derive(Component)]`、元组 spawn、`Query<(&A, &mut B)>`、`Single<&mut T>`。
 - **观察点**：`Query` 只返回**同时拥有**所声明组件的实体；给敌人实体不加 `Player` 标记，它就自动被排除。
 - **吸收旧版**：`004_component.rs`（旧版 `Health` 挂了却没用，这里真正用起来）。
 
-#### 006 `006_query.rs` — 查询的几种写法
+#### 006 `006_query.rs` — 查询的几种写法 ✅ 已实现
 - **目标**：同一件事的多种查询姿势，对应本项目"同一件事多种写法对照"的定位。
 - **核心 API**：`query.iter()`、`iter_mut()`、`single()`（返回 `Result`）、`get(entity)`、`par_iter()`、`Query::iter_many`。
 - **观察点**：`single()` 在 0.19 返回 `Result`——实体不存在时是 `Err` 而不是 panic，顺势讲"为什么 Bevy 把参数失败设计成跳过系统"。
 - **前置**：005。
 
-#### 007 `007_query_filter.rs` — 查询过滤与冲突
+#### 007 `007_query_filter.rs` — 查询过滤与冲突 ✅ 已实现
 - **目标**：`With`/`Without` 做筛选，以及"为什么两个查询会冲突"。
 - **核心 API**：`With`、`Without`、`Or`、`Has`，以及 `Without` 解开可变借用冲突的经典用法。
 - **观察点**：同时写 `Query<&mut Transform, With<Player>>` 和 `Query<&mut Transform, With<Enemy>>` → 编译期报冲突；加上 `Without` 互斥标注后编译通过。这是 Bevy 新手最常撞的墙。
 - **吸收旧版**：`005_query.rs` 的过滤部分 + `009_plugin.rs` 的 `Without` 用法。
 - **前置**：006。
 
-#### 008 `008_commands.rs` — 命令与增删改
+#### 008 `008_commands.rs` — 命令与增删改 ✅ 已实现
 - **目标**：理解 `Commands` 是**延迟执行**的，以及同步点在哪。
 - **核心 API**：`spawn`/`despawn`/`insert`/`remove`、`entity(id)`、`Commands::get_entity`、`apply_deferred`（隐式同步点）。
 - **观察点**：在同一系统里 `spawn` 之后立刻 `query` 查不到——命令还没落地；把 spawn 和 query 拆成两个系统（或加 `.chain()`）就好了。这个"为什么查不到"是新手的第二大坑。
@@ -369,6 +369,22 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 - 全部实施后重写 `README.md` 的课程表；在实施完成前，README 顶部保留"正在按 `CURRICULUM.md` 重排"的提示，避免编号混淆。
 - 每讲结束后跑 `cargo check --all-targets`，要求零警告再进下一讲。
 
+### 4.5 0.19.1 实测行为（不是改名，是语义）
+
+以下几条都是**实跑验证过的**，写后续讲次时直接采信，不要再凭印象：
+
+| 事实 | 实测结论 | 影响讲次 |
+|---|---|---|
+| 系统参数校验失败 | **分两类**：① `Single` / `Option<Single>` / `Populated` 条件不满足 → **静默跳过整个系统**（无输出、无报错、不 panic）；② 缺 `Res<T>` / `ResMut<T>` → **直接 panic**（`Resource does not exist`，exit 101）。错误处理器是 `FallbackErrorHandler`（0.19 由 `DefaultErrorHandler` 改名），默认 `match_severity`，`DefaultPlugins` **不会**改它 | 006 |
+| 同一系统内两个查询的借用冲突 | **运行时 panic**，错误码 `B0001`，**不是编译错误** —— `cargo check` 照样通过。修法：`Without<T>` 造互斥查询，或 `ParamSet` 合并 | 007 |
+| `Query` 遍历顺序 | **不是生成顺序**。Bevy 按原型(archetype)分组存储，遍历**逐组**进行，组间先后与生成时间无关，不可依赖 | 006 |
+| `Commands` 何时落地 | `ScheduleBuildSettings::auto_insert_apply_deferred` **默认为 `true`**：`.chain()` / `.after()` 会在"有延迟参数的系统 → 读相关数据的系统"这条边上自动插 `ApplyDeferred`。不声明顺序则落地时机不定（实测同帧内可查到 0 个）。`chain_ignore_deferred()` 只排序、不插同步点 | 008 |
+| `Has<T>` 的位置 | 它是**取数项**（写在元组里、返回 `bool`），**不是**过滤器；`With` / `Without` / `Or` 才是过滤器（写在第二个参数位置） | 007 |
+
+两条相关取舍：
+- `Query` 命中 0 个**永远不会**导致系统被跳过；只有 `Single` 那一类才会。
+- 需要固定遍历次序时，把结果收集成 `Vec` 后显式排序，不要依赖引擎的遍历顺序。
+
 ---
 
 ## 5. 旧版 → 新版对应关系（内容不丢）
@@ -394,7 +410,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | 里程碑 | 完成标志 | 状态 |
 |---|---|---|
 | M1 阶段一 | 004 跑完，能口头解释"为什么两个系统写同一资源会串行但顺序不定" | ✅ 已完成（001–004 已落地并实跑验证） |
-| M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | ⏳ |
+| M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | 🚧 进行中（005–008 已落地并实跑验证，剩 009–012） |
 | M3 阶段三 | 015 跑完，能用观察者替代消息、说清变更检测省下了什么 | ⏳ |
 | M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ⏳ |
 | M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ⏳ |
@@ -406,3 +422,17 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 > - `001_app.rs` 取代旧 `001_hello.rs`，改用 `println!` 并补充了「为什么只跑一帧」的源码级解释。
 > - 旧 `002_sprite.rs` 的窗口/相机部分独立成 `002_window.rs`；旧 `003_system.rs` 的时间部分按计划推迟到 010 讲。
 > - 被取代的四个旧文件保存在 git 提交 `21b0c91`（重排前的完整基线）。
+
+> 阶段二（005–008）的实施备注：
+> - **005 是可视化的**（窗口 + 精灵），用"两个方块动、一个不动"直观证明"查询按组件组合筛选"；
+>   006/007/008 是**无窗口纯控制台**的，因为它们讲的是查询语义与命令时序，文本比画面清楚。
+>   这个"概念可视化、机制文本化"的分工是实施时定下的，后续讲次沿用。
+> - `006_query.rs` 新增了原规划没有的两个知识点：① 取不到数据时 Bevy 的三种反应；
+>   ② **遍历顺序 ≠ 生成顺序**（原型分组存储）。后者是实跑时发现的，原规划完全没提。
+> - `007_query_filter.rs` 修正了原规划的一个说法：借用冲突是**运行时 panic（B0001）**而非编译错误。
+>   连带修掉了旧 `009_plugin.rs` 里"借用检查才能证明"这句不准确的注释。
+> - `008_commands.rs` 用一条六步 `.chain()` 流水线演示命令延迟与自动同步点，
+>   并在注释里回指 005 的 `Startup`（同一套同步点规则）。
+> - 旧 `005_query.rs` 已删除（内容被新 006/007 完全吸收）。其余旧文件（`006_input` / `007_resource` /
+>   `008_message` / `009_plugin` / `010_game`）**保留**，因为它们的对应讲次（009/011/012/013/016/031）
+>   还没写；`README.md` 里用单独的「旧版例子」表列出，避免与新编号混淆。
