@@ -20,7 +20,8 @@ fn main() {
         .add_systems(Startup, say_hello)
         // Update 调度：每帧跑一次，游戏逻辑的主战场。
         .add_systems(Update, tick)
-        // 实验：去掉下一行的注释再跑，你会得到行为完全不同的程序。
+        // 对照：加上 DefaultPlugins 之后，runner 会被 winit 换成事件循环，
+        // 程序不再跑一帧就退，末尾那行 println! 也永远不会执行。
         // .add_plugins(DefaultPlugins)
         .run();
 

@@ -1,7 +1,7 @@
 # bevy_study
 
 用递进的小例子学习 **Bevy 0.19.1** 的 ECS 核心。
-每个例子都是一个可以单独运行的程序，建议按编号顺序看，并**亲手改一改再跑**。
+每个例子都是一个可以单独运行的程序，建议按编号顺序看。
 
 - 引擎版本：`bevy = "0.19.1"`
 - Rust edition：`2024`（实测工具链 `rustc 1.99.0`）
@@ -34,12 +34,10 @@ cargo check --examples
 
 ---
 
-## 学习方法
+## 怎么读这些例子
 
-1. **先跑起来看现象**，再看代码。每个例子下面都写了「观察点」。
-2. **改参数做实验**：改速度、改颜色、改过滤条件，看行为怎么变。
-3. **故意改错**：把 `pressed` 改成 `just_pressed`、把 `With` 去掉，看 Rust 编译器和 Bevy 报什么错——这是理解 ECS 借用规则最快的方式。
-4. **做练习**：每个例子末尾的练习题都只用到了当前及之前学过的概念。
+每个例子都按「先跑起来看现象，再看代码」的顺序组织：现象写在**观察点**里，原理和踩坑写在**要点**里。
+例子里的参数（速度、颜色、过滤条件）都可以直接改，行为会随之变化；把 `pressed` 改成 `just_pressed`、把 `With` 去掉，也能立刻看到 Rust 编译器和 Bevy 的报错。
 
 ---
 
@@ -49,7 +47,7 @@ cargo check --examples
 |---|------|------|------|
 | 001 | [001_app.rs](examples/001_app.rs) | 最小 App：为什么它只跑一帧就退出 | ✅ 新规划 · 阶段一 |
 | 002 | [002_window.rs](examples/002_window.rs) | 窗口与相机：窗口 ≠ 画面 | ✅ 新规划 · 阶段一 |
-| 003 | [003_sprite.rs](examples/003_sprite.rs) | 精灵、坐标轴、层叠与必需组件 | ✅ 新规划 · 阶段一 |
+| 003 | [003_sprite.rs](examples/003_sprite.rs) | 精灵、坐标系与手性、层叠、必需组件 | ✅ 新规划 · 阶段一 |
 | 004 | [004_schedule.rs](examples/004_schedule.rs) | **系统执行顺序与顺序歧义检测** | ✅ 新规划 · 阶段一 |
 | 005 | [005_query.rs](examples/005_query.rs) | 查询过滤 | 🕗 旧版，待重排 → 新 006/007 |
 | 006 | [006_input.rs](examples/006_input.rs) | 键盘输入 | 🕗 旧版，待重排 → 新 011 |
@@ -86,10 +84,8 @@ App::new()
   - `App::new()` 其实就是 `App::default()`，而它内部调用了 `App::empty()`，那里把 runner 设成了 `run_once`（`bevy_app-0.19.1/src/app.rs:152`）。`run_once` 的实现只调用**一次** `app.update()`。
   - 加上 `DefaultPlugins` 后，winit 会 `set_runner` 把 runner 换成事件循环，程序才会一直运行到关窗口。
   - `Local<T>` 是**系统私有状态**：只属于这一个系统，跨帧保持。
+- **对照**：把 `.add_plugins(DefaultPlugins)` 的注释去掉，程序会弹窗并永远运行，末尾那行 `println!` 再也不会执行。
 - **坑**：这里必须用 `println!` 而不是 `info!`。没有 `DefaultPlugins` 就没有 `LogPlugin`，没人安装 tracing 订阅者，`info!` 会被**静默丢弃**，终端上什么都看不到。
-- **实验**：去掉 `.add_plugins(DefaultPlugins)` 的注释再跑——会弹窗并永远运行，末尾那行 `println!` 再也不会执行。
-
-**练习**：再加一个 `Update` 打印系统，观察它和 `tick` 的先后顺序（**不确定**，两者无数据冲突，可能并行）。
 
 ---
 
@@ -100,19 +96,17 @@ App::new()
   - `DefaultPlugins` 是引擎的功能包（窗口、渲染、输入、时间、日志……），同时把 runner 换成事件循环。
   - `DefaultPlugins.set(WindowPlugin { .. })` 用来覆盖其中某一个插件：这里设置了标题和初始分辨率。
   - `ClearColor` 是一个 **Resource**，存「默认清屏色」。
-- **★ 这个例子最该做的实验**：把 `commands.spawn(Camera2d)` 注释掉再跑。
-  程序照常启动、窗口照常弹出、终端**不报任何错**，但窗口里什么都没有——**连 `ClearColor` 都不生效**。
-  因为清屏是**相机**的渲染流程干的，`ClearColor` 只是个默认值，没有相机就没人去清屏。
-  → 记住这条：**窗口 ≠ 画面**。以后遇到「窗口是黑的但不报错」，第一反应就查相机。
+- **★ 本讲的关键结论**：相机决定的是「往窗口里渲染什么」，而不是「窗口存不存在」。
+  去掉 `commands.spawn(Camera2d)` 之后，程序照常启动、窗口照常弹出、终端**不报任何错**，但窗口里什么都没有——**连 `ClearColor` 都不生效**。
+  因为清屏是**相机**的渲染流程干的：`ClearColor` 只是个默认值，真正去读它、执行清屏的是相机，没有相机就没有渲染流程。
+  → 所以 **窗口 ≠ 画面**。遇到「窗口是黑的但不报错」，第一反应就查相机。
 - **扩展**（文件末尾有完整写法）：`WindowMode::BorderlessFullscreen(..)` 全屏；
   `Camera { clear_color: ClearColorConfig::Custom(..) }` 给单台相机换清屏色。
   注意区分 `ClearColor`（全局 Resource）与 `ClearColorConfig`（相机身上的字段）。
 
-**练习**：改成启动即全屏；再改成只有一台相机用黑色清屏。
-
 ---
 
-### 003_sprite.rs —— 精灵、坐标轴、层叠
+### 003_sprite.rs —— 精灵、坐标系与手性、层叠
 
 - **观察点**：三个方块——中间红色（原始大小）、左上绿色（缩到 55% 并旋转 45°）、右下蓝色（横向拉长压扁）。
 - **要点**：
@@ -126,14 +120,10 @@ App::new()
   - `z` 决定谁在前：z 越大越靠前。2D 里 z 不是「深度」，而是**层叠顺序**。
   - `scale` 是 `Vec3`，2D 只用 x、y，z 保持 1.0。
   - **必需组件**：只写 `Sprite` 也能跑，因为 `Sprite` 声明了自己需要 `Transform` 和 `Visibility`，引擎会自动补齐。这也解释了为什么你从来不用手写 `Visibility`。
-- **实验**：
-  - 把绿色方块的 z 从 `1.0` 改成 `-1.0`，它会跑到红色后面去；把 y 取反，验证 y 轴朝上。
-  - 两个精灵 z 相同时谁在前面**没有保证**，要控制层叠就老实给不同的 z。
-  - ★ **验证手性**：把绿色方块的旋转分别改成 `+FRAC_PI_2` 和 `-FRAC_PI_2`，正角度是**逆时针**转。
-    这不是巧合：右手系里绕 +Z 的正向旋转，按右手定则看起来就是逆时针（已实测 `rot_z(+90°) · +X = +Y`）。
+  - **旋转的正方向是逆时针**：`Quat::from_rotation_z(+90°)` 把「向右」转成「向上」。
+    这不是巧合，而是右手系的必然结果——按右手定则（拇指指向你、四指弯曲方向为正），绕 +Z 的正向旋转看起来就是逆时针；换成左手系，同样的代码会转成顺时针。（实测 `rot_z(+90°) · +X = +Y`）
+  - **z 相同时不保证顺序**：两个精灵 z 相同时谁在前面，取决于内部排序，引擎对此不做任何承诺。要控制层叠就给不同的 z，别依赖 spawn 先后。
 - **关于画圆**：本讲的 `Sprite` 只能画矩形。想画圆/多边形要走 `Mesh2d` + `ColorMaterial`（不需要图片文件），等 027 讲 3D 时对比更清楚；用贴图则在 020。
-
-**练习**：用若干方块拼一个雪人（身体、头、帽檐三层，z 依次递增）。
 
 ---
 
@@ -158,7 +148,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   2. 一旦两个系统访问同一份数据（一读一写、或都写），引擎会自动把它们**串行**，但**先后顺序仍然不做保证**——这叫**顺序歧义**。
   3. 需要确定顺序必须**显式声明**：`.chain()` / `.before()` / `.after()` / `SystemSet`。
 - **要点**：
-  - 用 `edit_schedule(Update, |s| s.set_build_settings(ScheduleBuildSettings { ambiguity_detection: LogLevel::Warn, .. }))` **主动打开歧义检测**。建议自己项目里也开着。
+  - 用 `edit_schedule(Update, |s| s.set_build_settings(ScheduleBuildSettings { ambiguity_detection: LogLevel::Warn, .. }))` **主动打开歧义检测**，这是排查这类 bug 最有效的一招。
   - `#[derive(SystemSet)]` 给一组系统起名，`report.after(Battle)` 就能对**整组**声明顺序；以后往组里加系统不用改外面的声明。
   - `.before()` / `.after()` 是**传递**的：A before B、B before C ⇒ A before C。
   - 只有 `LogPlugin` 而没有 `DefaultPlugins` 时，App 仍然只跑一帧就退出（呼应 001），正好适合看这种一次性报告。
@@ -166,16 +156,13 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   Bevy 的调度在同一构建里通常表现一致，所以这类 bug **不会随机复现**——要么一直对、要么一直错，错的时候看起来还挺像「故意这么设计的」。
   危险在于它**没有任何保证**：加一个系统、调一次注册顺序，就可能翻过来。
   所以判断标准不是「我现在跑着是对的」，而是「我有没有显式声明顺序」。
+- **两种修法（都已实测）**：
+  - 改法 ①：`check_death.in_set(Battle).after(apply_damage)` → 得分变 `100`，WARN 消失。
+  - 改法 ②：`(new_wave, apply_damage, check_death).chain().in_set(Battle)` → 效果相同。
 - **看不到系统名？** Bevy 默认把名字藏起来了（那几处 `<Enable the debug feature ...>`）。在 `Cargo.toml` 里打开即可：
   ```toml
   bevy = { version = "0.19.1", features = ["debug"] }
   ```
-
-**实验（已实测有效）**：
-- 改 ①：`check_death.in_set(Battle).after(apply_damage)` → 得分变 `100`，WARN 消失。
-- 改 ②：`(new_wave, apply_damage, check_death).chain().in_set(Battle)` → 效果相同。
-
-**练习**：写一个 `sync_health_bar` 读 `Health`，故意和 `apply_damage` 产生歧义，然后分别用 `.after()` / `.before()` 修，观察「血条慢一帧」的现象。
 
 ---
 
@@ -191,8 +178,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - `With<T>` = 只匹配拥有 `T` 的实体（不读取 `T` 本身）。对应的还有 `Without<T>`。
   - 同样的 `Transform` 组件，靠过滤器区分出了两种角色。
 
-**练习**：给 Enemy 也加一个移动系统；再试试 `Query<&Transform, (With<Enemy>, Without<Player>)>`。
-
 ---
 
 ### 006_input.rs —— 键盘输入
@@ -204,9 +189,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
     这是最容易搞混的一点：用 `pressed` 做「按一次触发一次」的事情会变成每帧触发。
   - 这里生成玩家时**没写 `Transform`**，但 `move_player` 照样能查到它——因为 `Sprite` 自动补齐了 `Transform`（required components）。
 
-**练习**：加一个「按住 Shift 加速」；
-把 `on_space` 里的 `just_pressed` 改成 `pressed`，看看日志是怎么刷屏的——这就是「每帧触发」的坑。
-
 ---
 
 ### 007_resource.rs —— 资源：全局唯一的数据
@@ -217,8 +199,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - `Res<Score>` 只读，`ResMut<Score>` 可写，两者**不能同时存在于一个系统**。
   - 组件描述「有哪些实体」，资源描述「整个游戏共享的状态」（分数、配置、计时器……）。
 - **注意**：`add_score`（写）和 `show_score`（读）都访问 `Score`，所以调度器会把它们**串行**执行，但**谁先谁后是不确定的**——参见 004。
-
-**练习**：把 `add_score` 改成每 0.5 秒才加一次分（提示：用 `Res<Time>` 自己累加，或用 `Timer`）。
 
 ---
 
@@ -241,9 +221,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
     所以 `main` 里写了 `(death_system, score_system).chain()` 明确顺序。
   - `observe` 挂在实体上，`On<EntityDied>` 里可以像普通系统一样注入 `ResMut<Score>`。
 
-**练习**：再加一个系统也去读 `PlayerDied`，验证「一条消息可以被多个系统消费」；
-然后把 `.chain()` 删掉，观察输出是否晚了一帧。
-
 ---
 
 ### 009_plugin.rs —— 插件：把功能打包
@@ -257,8 +234,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - `Without<Player>` 的作用：`award_hit` 里同时有「读玩家的 Transform」和「写敌人的 Transform」，
     必须让编译器能证明这两个查询**互不相交**，否则会报查询冲突。`With<Player>` + `Without<Player>` 就构成了这个证明。
 - **注意**：相机是用裸 `add_systems(Startup, setup_common)` 注册的，没放进插件里——留作对比。
-
-**练习**：把 `setup_common` 也封成一个 `CameraPlugin`；再加一个 `EnemyPlugin` 内部的重生逻辑，让敌人被打中后出现在随机位置。
 
 ---
 
@@ -281,12 +256,6 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
   - `check_collision` 改分、`update_score_display` 读分：顺序反了 UI 就会慢一帧。
   - 射速用 `FireCooldown(Timer)` 控制。如果用裸 `keyboard.pressed(Space)` 不加冷却，按住就是**每秒 60 发**。
   - `cleanup_bullets` 飞出屏幕就 `despawn`，避免实体无限增长。
-
-**练习**：
-1. 把冷却从 0.15 秒改成 0.05 秒，感受射速变化。
-2. 让敌人被消灭后在随机位置重生，做成可以一直玩的循环。
-3. 加一个「敌人也会向玩家移动」的系统。
-4. 用 `States` 加一个「开始 / 游戏中 / 结束」的界面切换（在 031 会正式讲）。
 
 ---
 
