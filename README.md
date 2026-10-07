@@ -7,10 +7,8 @@
 - Rust edition：`2024`（实测工具链 `rustc 1.99.0`）
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
-> ⚠️ **课程正在重排。** 新版规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一、二、三已完成（新编号 001–015）。**
-> 重排前的旧例子大部分已被吸收删除，剩下三个存档在 [`legacy_examples/`](legacy_examples/)（**不再参与编译**），
-> 只作参考。对应关系见 `CURRICULUM.md` 第 5 节。
+> ⚠️ **课程仍在推进中。** 完整规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
+> **当前进度：阶段一、二、三已完成（001–015）。**
 
 ---
 
@@ -66,23 +64,6 @@ cargo check --examples
 | 013 | [013_observer.rs](examples/013_observer.rs) | 观察者与实体事件：精准投递、链式反应 |
 | 014 | [014_hierarchy.rs](examples/014_hierarchy.rs) | 父子层级：变换继承，只转父节点整棵树跟着动 |
 | 015 | [015_change_detection.rs](examples/015_change_detection.rs) | 变更检测：只对"变过的数据"干活 |
-
-## 旧版例子（已移出，存档在 `legacy_examples/`）
-
-这些例子**不再是 cargo 目标**：`cargo run --example 009_plugin` 之类会报「没有这个目标」。
-文件放在 [`legacy_examples/`](legacy_examples/)，只作参考，说明见该目录的 `README.md`。
-
-| 文件 | 主题 | 去向 | 状态 |
-|------|------|------|------|
-| [009_plugin.rs](legacy_examples/009_plugin.rs) | 插件与插件组 | → 新 016 | 待吸收 |
-| [010_game.rs](legacy_examples/010_game.rs) | 综合小游戏 | → 新 031 | 待吸收 |
-
-> 已经**吸收完毕并删除**的旧文件：
-> `005_query.rs`（→ 新 006/007 的过滤部分）、
-> `006_input.rs`（→ 新 011）、
-> `007_resource.rs`（→ 新 009）、
-> `008_message.rs`（→ 新 012 讲消息 + 013 讲观察者，两半都讲完了）。
-> 需要它们时从 git 历史里取，例如 `git show 21b0c91:examples/001_hello.rs`。
 
 ---
 
@@ -206,7 +187,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - 红方块不动就是核心证据：它的 `Transform` 组件明明也在，但没有 `Player` 标记就**不会被命中**。查询匹配的是「组件组合」，不是「某一个组件」。
   - 一个实体上同一种组件**只能有一份**；`derive(Component)` 的类型必须 `Send + Sync + 'static`。
   - 查询命中 0 个完全正常：系统照常运行、不会被跳过（对比 006 的 `Single`）。
-  - 这里的 `Health` 是**真正被使用**的（跑起来能看到颜色随之变化），不像旧版 004 里挂了却没用。
+  - 这里的 `Health` 是**真正被使用**的：跑起来能看到颜色随血量变化，而不是挂上去就没人管。
 - **布局**：窗口 960×640；方块的坐标和 `Speed` 值都写在 `setup` 里，可直接改。
 
 ---
@@ -429,92 +410,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ---
 
-## 逐个说明 · 旧版（待重排）
-
-> 下面这些例子是**重排前的内容**，已移到 [`legacy_examples/`](legacy_examples/)，**不再是 cargo 目标**
-> （`cargo run --example 006_input` 会报「没有这个目标」）。说明与代码仍然对应，留作参考；
-> 想在当前仓库里跑一下，先 `git mv legacy_examples/006_input.rs examples/`。
-
-### 006_input.rs —— 键盘输入
-
-- **观察点**：WASD 移动小方块；按空格打印一次 `Space Pressed`。
-- **要点**：
-  - `Res<ButtonInput<KeyCode>>` 读取键盘状态。
-  - `pressed(..)` = 按住期间**每帧**为真；`just_pressed(..)` = 只在**按下的那一帧**为真。
-    这是最容易搞混的一点：用 `pressed` 做「按一次触发一次」的事情会变成每帧触发。
-  - 这里生成玩家时**没写 `Transform`**，但 `move_player` 照样能查到它——因为 `Sprite` 自动补齐了 `Transform`（required components，见 003）。
-
----
-
-### 007_resource.rs —— 资源：全局唯一的数据
-
-- **观察点**：控制台每帧打印分数，数值每帧 +100，倍率每帧 +0.1。
-- **要点**：
-  - `#[derive(Resource)]` + `init_resource::<Score>()` 注册全局资源。
-  - `Res<Score>` 只读，`ResMut<Score>` 可写，两者**不能同时存在于一个系统**。
-  - 组件描述「有哪些实体」（见 005），资源描述「整个游戏共享的状态」（分数、配置、计时器……）。
-- **注意**：`add_score`（写）和 `show_score`（读）都访问 `Score`，所以调度器会把它们**串行**执行，但**谁先谁后是不确定的**——参见 004。
-
----
-
-### 008_message.rs —— 消息 vs 观察者
-
-一个例子对比两种事件机制，**都按键盘触发，方便对比**：
-
-| 按键 | 机制 | 特点 |
-|------|------|------|
-| `空格` | `Message` | 缓冲消息。写入者与读取者无需知道对方，适合「一件事发生，多个系统响应」 |
-| `K` | `EntityEvent` + 观察者 | 事件带**目标实体**，只有监听该实体的观察者会收到 |
-
-- **观察点**：按空格 → 先打印 `Sent:`，再打印 `Received: ... total = 100`。
-  按 K → 先打印 `Triggered:`，**然后**才是观察者里的 `Entity died!`。
-  后者的顺序体现了 `commands.trigger` 是**延迟执行**的（命令在同步点统一生效，见 008）。
-- **要点**：
-  - `add_message::<PlayerDied>()` 注册消息类型。
-  - `MessageWriter::write` 写入，`MessageReader::read` 消费。
-  - **消息是双缓冲的**：如果读取者排在写入者**之前**，本帧写进去的消息就要等下一帧才读到。
-    所以 `main` 里写了 `(death_system, score_system).chain()` 明确顺序。
-  - `observe` 挂在实体上，`On<EntityDied>` 里可以像普通系统一样注入 `ResMut<Score>`。
-
----
-
-### 009_plugin.rs —— 插件：把功能打包
-
-- **观察点**：WASD 控制玩家、方向键控制敌人；**玩家碰到敌人时分数 +10**，敌人镜像跳到对角位置，日志打印 `Score: 10 / 20 / ...`。
-- **要点**：
-  - `Plugin` 把「一组资源 + 一组系统」打包，`build()` 里注册。
-  - `PluginGroup` + `PluginGroupBuilder` 把多个插件再打包成一个（`GamePlugin`）。
-  - **插件之间通过共享资源协作**：`Score` 由 `ScorePlugin` 拥有，`EnemyPlugin` 里的 `award_hit` 去写它。
-  - `is_changed()` 只在资源**被修改过**的那一帧返回 true，用它做日志就不会每帧刷屏。
-  - `Without<Player>` 的作用：`award_hit` 里同时有「读玩家的 Transform」和「写敌人的 Transform」，
-    必须加上 `Without<Player>` 才能让 Bevy 认定两个查询**互不相交**，否则会触发 `B0001` 冲突。
-    ⚠️ 这个检查在**运行时**（详见 007）。
-- **注意**：相机是用裸 `add_systems(Startup, setup_common)` 注册的，没放进插件里——留作对比。
-
----
-
-### 010_game.rs —— 综合：一个能玩的小游戏
-
-WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在左上角。
-
-- **观察点**：按住空格时子弹是**以固定射速**连续发出的，而不是每帧一颗。
-- **要点（这个例子的重点其实是「系统顺序」）**：
-
-```rust
-// 输入 -> 写消息 -> 读消息建子弹
-(shoot, spawn_bullet).chain(),
-// 先移动子弹，再判定碰撞，最后刷新 UI
-(move_bullet, check_collision, update_score_display).chain(),
-```
-
-  - `.chain()` 表示「按顺序执行」。不写的话，Bevy 只在**数据冲突**时才强制串行，顺序是它自己挑的（详见 004）。
-  - `shoot` 写消息、`spawn_bullet` 读消息：**写入者必须在前**，否则子弹要等下一帧才生成。
-  - `check_collision` 改分、`update_score_display` 读分：顺序反了 UI 就会慢一帧。
-  - 射速用 `FireCooldown(Timer)` 控制。如果用裸 `keyboard.pressed(Space)` 不加冷却，按住就是**每秒 60 发**。
-  - `cleanup_bullets` 飞出屏幕就 `despawn`，避免实体无限增长。
-
----
-
 ## 常见坑速查
 
 | 现象 | 原因 |
@@ -552,5 +447,3 @@ WASD 移动、按住空格射击、打中敌人 +100 分、分数实时显示在
 | 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |
 | 六 · 3D 与渲染（3D / glTF / 拾取 / 着色器） | 027–030 | ⏳ |
 | 七 · 工程质量（综合 / 测试 / 剖析发布） | 031–033 | ⏳ |
-
-旧 10 讲的内容在新规划中**全部保留**，对应关系见 `CURRICULUM.md` 第 5 节。
