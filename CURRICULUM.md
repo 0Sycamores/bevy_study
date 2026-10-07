@@ -17,6 +17,10 @@
    现象与结论一律用**陈述句**写进正文——不写"把 X 注释掉试试，会看到 Y"，
    而写"去掉 X 的后果是 Y，原因是……"。布局上：现象放「观察点」，原理放「要点」。
    此规则对后续所有讲次（005–033）生效。
+8. **每讲的例子只服务本讲的主题**，不要把前面讲次的机制堆进来显得更"完整"。
+   010 讲时间就只讲时间，不顺手示范移动方块；011 讲输入就只讲输入，不写成射击教程。
+   确实需要借用前面讲次的东西时，让它当**配角**、在注释里点明"细节在 X 讲"，不要让它抢戏。
+   （这条是实施 010/011 时发现走偏后补上的，见文末阶段二备注。）
 
 ---
 
@@ -115,29 +119,46 @@
 - **前置**：008。
 
 #### 010 `010_time.rs` — 时间与计时器 ✅ 已实现
-- **目标**：帧率无关的逻辑，以及 `Timer` 的多种驱动写法。
-- **核心 API**：`Time`（`delta_secs`/`elapsed_secs`）、`Timer`/`TimerMode`/`Stopwatch`、`tick(Duration)`/`is_finished()`/`just_finished()`/`reset()`、`Time<Virtual>`、`Time<Fixed>`。
-- **内容安排**（本项目刚删掉的 `main.rs` 计时器内容在这里正式落地）：
-  1. 三种计时写法对照：**每帧 if 累加** vs **`Timer` 资源** vs **`Timer` 组件**；讲清各自适用场景。
-  2. `TimerMode::Once` 与 `Repeating` 的差异，`just_finished()` 为什么比 `is_finished()` 更适合触发一次性动作。
-  3. 用 `Time<Virtual>` 做暂停/倍速。
-- **观察点**：用 `delta_secs` 和无 `Time` 的"每帧加固定值"两种写法跑同一个移动系统，在人为降帧时对比位移。
-- **吸收旧版**：`003_system.rs` 的时间部分 + 已从 `src/main.rs` 删除的计时器示例。
+- **目标**：**只讲时间本身** —— `Time` 怎么读、`Timer` 怎么写、`Stopwatch` 怎么用、怎么暂停与倍速。
+- **核心 API**：`Time`（`delta_secs`/`elapsed_secs`）、`Timer`/`TimerMode`/`Stopwatch`、
+  `tick`/`just_finished`/`is_finished`/`elapsed`/`remaining`/`fraction`/`duration`/`pause`/`unpause`/`reset`、
+  `Time<Real>`/`Time<Virtual>`/`Time<Fixed>`。
+- **结构**（实施时定为两段、两个 App，原因见下）：
+  1. **第一段**：`Timer` 的三种驱动写法对照（手动累加 / 资源 / 组件），第 3 帧三种同时触发；
+     逐帧打印 `Time` 与两个 `Timer` 的完整状态；`Stopwatch` 的 `pause`/`unpause`/`reset`。
+  2. **第二段**：`Time<Virtual>` 的暂停与倍速，实测三行对比 `Time` / `Real` / `Virtual` 的 delta。
+- **⚠️ 实施时修正**：原规划的观察点是"用 `delta_secs` 和无 `Time` 的每帧加固定值跑同一个移动系统，对比位移"，
+  这把重点带到了**移动**上（那是 Transform 的事，见 003），而 `Time<Virtual>` 这个列出的核心 API
+  反倒只能写在注释里。现按"每讲只服务本讲主题"（规划原则第 8 条）改成上面这样：
+  去掉移动演示，把 `Time<Virtual>` 提升为现场演示。
+- **为什么分两段**：`Time<Virtual>` 由 `TimePlugin` 提供，而装了它会**覆盖手动 `advance_by`**
+  （实测，见 4.5）—— 想精确控时就不能装插件，想用虚拟时钟就必须装。两个需求互斥，只能分两个 App。
+- **吸收旧版**：已从 `src/main.rs` 删除的计时器示例（`003_system.rs` 的时间部分早已并入）。
 - **前置**：009。
 
 #### 011 `011_input.rs` — 键盘与鼠标输入 ✅ 已实现
-- **目标**：拿输入驱动逻辑，分清"持续"和"瞬间"。
-- **核心 API**：`ButtonInput<KeyCode>`/`ButtonInput<MouseButton>`、`pressed`/`just_pressed`/`just_released`、`AccumulatedMouseMotion`、光标 → 世界坐标。
-- **观察点**：经典 bug 现场——用 `pressed` 做"按一次开一枪"，按住会变成每秒 60 发；换成 `just_pressed` + 冷却计时器才对。这正是旧版 `010_game.rs` 踩过的坑，在这里提前讲掉。
-- **吸收旧版**：`006_input.rs`。
-- **前置**：010。
+- **目标**：**只讲输入本身** —— 输入从哪几个资源来、怎么查、以及"按下"的三种语义。
+- **核心 API**：`ButtonInput<KeyCode>` / `ButtonInput<Key>` / `ButtonInput<MouseButton>`、
+  `pressed`/`just_pressed`/`just_released`、`AccumulatedMouseMotion`、`AccumulatedMouseScroll`、
+  `Window::cursor_position()`、`Camera::viewport_to_world_2d`。
+- **观察点**：每秒一行汇总。按住空格时 `just_pressed` 1 次 / `pressed` 60 次 —— 那个 60 就是帧率。
+- **⚠️ 实施时修正**：原规划写的是"用 `pressed` 做按一次开一枪会变成每秒 60 发，换成 `just_pressed` + 冷却计时器"，
+  方向对，但落地时滑向了**射击教程**（移动方块 + 冷却 + 射速），本讲自己的东西（`Key` vs `KeyCode`、
+  鼠标移动量 / 滚轮、光标换算）只剩注释。现按规划原则第 8 条重写：去掉移动与射击叙事，
+  把五种输入资源、离散/连续两类形态、以及光标 → 世界坐标换算全部做成**现场演示**。
+- **配角标注**：`Time` / `Timer` 只用来把刷屏输入压成每秒一行，注释里明说"细节在 010"；
+  相机的玩法（跟随/缩放/分屏）指向 025。
+- **吸收旧版**：`006_input.rs`（已随之从 `legacy_examples/` 删除）。
+- **前置**：009、010。
 
 #### 012 `012_message.rs` — 消息（0.17 起由 Event 改名） ✅ 已实现
 - **目标**：系统间解耦通信。
 - **核心 API**：`#[derive(Message)]`、`app.add_message::<T>()`、`MessageWriter::write`、`MessageReader::read`、`MessageMutator`、`MessageReader` 的双缓冲语义。
 - **观察点**：
-  1. 消息**会过期**——没被读走就丢，和"事件队列"的直觉不同。
-  2. Bevy 自动保证 `MessageWriter` 排在对应 `MessageReader` 之前（上游 `ecs/message.rs:143` 明确说明），所以写读顺序不用手动 `.chain()`。
+  1. 消息**只活两帧**（双缓冲）：写在第 N 帧 → 第 N、N+1 帧可读 → 第 N+2 帧消失，没人读就自己丢弃。
+  2. **Bevy 不会自动把 `MessageWriter` 排在 `MessageReader` 之前** —— 见 4.5 的实测记录。
+     原规划此处曾写"引擎自动保证写者在前"，**该说法是错的**，已按实测更正。
+     不声明顺序时读者会排在写者前面，表现为"晚一帧"；必须 `.chain()` / `.after()`。
 - **吸收旧版**：`008_message.rs` 的消息部分。
 - **前置**：009、010。
 
@@ -387,6 +408,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | 消息的读写顺序 | **Bevy 不会自动把 `MessageWriter` 排在 `MessageReader` 之前**（与常见的相反说法不符，实测读者会先跑）。不声明顺序就晚一帧生效，必须 `.chain()` / `.after()` | 012 |
 | `init_resource` 的语义 | **资源已存在时不覆盖**（实测 `insert(42)` 后再 `init` 仍是 42）；`insert_resource` 会覆盖，所以"重置资源"要用后者 | 009 |
 | `Stopwatch` 的位置 | **不在 prelude 里**，需要 `use bevy::time::Stopwatch;` | 010 |
+| 几个不在 prelude 的类型 | `Stopwatch` → `bevy::time::Stopwatch`；`AccumulatedMouseMotion` / `AccumulatedMouseScroll` → `bevy::input::mouse::{..}`；`Key` → `bevy::input::keyboard::Key`。用到时都要单独 `use` | 010 / 011 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
@@ -466,3 +488,8 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 >   同帧同类型的两个读者，有序的读到本帧、无序的读到上一帧。消息**只活两帧**。
 > - 已吸收完毕并从 `legacy_examples/` 删除：`006_input.rs`（→ 011）、`007_resource.rs`（→ 009）。
 >   剩余 `008_message.rs`（等 013 讲完观察者那一半）、`009_plugin.rs`（等 016）、`010_game.rs`（等 031）。
+> - **返工记录（010 / 011）**：初版把"移动方块 / 射击冷却"当成了主线，本讲自己的 API 反倒靠边 ——
+>   010 的 `Time<Virtual>`（列出的核心 API）只写在注释里、011 的 `Key` / 滚轮 / 光标换算全没演示。
+>   按"每讲只服务本讲主题"重写：010 去掉移动演示、把虚拟时钟提为现场演示；
+>   011 去掉移动与射击叙事、把五种输入资源与两类形态全做成演示。
+>   相应地补了规划原则第 8 条，010 / 011 的讲次规格也已改写。

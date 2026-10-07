@@ -274,40 +274,56 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ### 010_time.rs —— 时间与计时器
 
-- **观察点**：10 帧逐帧输出。前 5 帧每帧 100ms、后 5 帧切成 50ms —— 两个"移动者"的最终位置：
+- **观察点**：分两段。第一段逐帧打印"时间现场"（5 帧，输出稳定可复核）；第二段演示暂停与倍速：
 
   ```text
-  ── 第 10 帧   帧长  50ms   真实累计 0.75s
-          delta法= 75.0   定步法=100.0
-  ```
+  ── 第 3 帧
+       【写法① 手动累加】触发（结转 0.05s）
+       【写法② Timer 资源】触发
+       【写法③ Timer 组件】组件A 触发
+       Time      delta 0.10s   elapsed 0.30s
+       Repeating elapsed 0.05/0.25s   remaining 0.20s   fraction  20%   finished true
+       Once      elapsed 0.30/0.35s   remaining 0.05s   fraction  86%   finished false
+       Stopwatch elapsed 0.20s
 
-  真实只过了 0.75 秒、速度 100/s，正确值就是 **75**。`delta法` 对，`定步法` **多了 33%**。
+  ── 正常      Time.delta  100.3ms   Real.delta  100.3ms   Virtual.delta  100.3ms   paused=false  speed=1
+  ── 暂停      Time.delta    0.0ms   Real.delta  100.3ms   Virtual.delta    0.0ms   paused=true   speed=1
+  ── 3 倍速    Time.delta  302.0ms   Real.delta  100.7ms   Virtual.delta  302.0ms   paused=false  speed=3
+  ```
 - **要点**：
-  - **任何随时间变化的量（位移、缩放、冷却、动画进度）都必须乘 `delta_secs()`**，绝对不能按帧算。帧率一变，按帧算的写法就跟着变。
-  - **`Timer` 的三种写法**在同一讲里对照，且三种在同一帧触发（说明等价），选哪种看用途：
-    手动累加（最灵活、也最容易写错，要自己结转超出部分）/ `Timer` 资源（全局唯一的定时）/ `Timer` 组件（每个实体各自节奏）。另有 `Stopwatch`（只计时、不触发）。
-  - ⚠️ **`is_finished()` 对 `Once` 计时器到点后每帧都为真** —— 拿它做「触发一次」会变成每帧触发。要「只触发一次」就用 `just_finished()`。（输出里 `【Once + is_finished】` 那行从第 5 帧起一直刷，就是在演示这个坑。）
-  - `Res<Time>` 拿到的其实是**虚拟时钟**。实测：正常时 `Time = Real = Virtual`；`pause()` 后 `Time = Virtual = 0` 而 **`Real` 照走**；`set_relative_speed(3.0)` 后 `Time = Virtual ≈ 3×Real`。做暂停菜单改 `Time<Virtual>` 就够了。
-  - 本讲**不用** `DefaultPlugins`，而是手动 `app.update()` + `advance_by` 逐帧推进 —— 时间行为只有帧长可控时才看得清（装了 `TimePlugin` 反而会覆盖手动推进的时间）。
+  - **`Timer` 的三种驱动写法**在同一讲里对照，第 3 帧三种**同时触发**（说明等价），选哪种看用途：
+    手动累加（最灵活、也最容易写错，必须**结转**超出部分）/ `Timer` 资源（全局唯一的定时）/ `Timer` 组件（每个实体各自节奏）。
+  - `Timer` 的状态全都能读：`elapsed` / `remaining` / `fraction` / `duration` / `is_finished`；另有 `pause` / `unpause` / `reset` / `set_duration`。
+  - ⚠️ **`is_finished()` 对 `Once` 到点后每帧都为真**（第 4 帧起一直是 `true`），拿它做「触发一次」会变成每帧触发，要「刚刚到点」必须用 `just_finished()`。
+    另外注意 Repeating 在**完成的那一帧** `finished` 也是 `true`，但 `elapsed` 已经绕回（看第 3、5 帧）。
+  - **`Res<Time>` 拿到的就是虚拟时钟**：暂停时 `Time = Virtual = 0` 而 **`Real` 照走**；倍速则 `Time = Virtual ≈ 3×Real`。做暂停菜单改 `Time<Virtual>` 就够了。
+  - `Stopwatch` 只计时、永远不 finished：`pause()` 冻结、`unpause()` 从原处继续、`reset()` 归零。用它做冷却显示、计时赛、性能统计。
+  - 本讲**只讲时间本身**，不碰移动、射击之类的游戏逻辑。第一段**不装** `TimePlugin`（这样 `advance_by` 才能精确控时），第二段**必须装**（`Time<Virtual>` 由它提供）—— 所以分成两个 App 跑，原因写在例子注释里。
 
 ---
 
 ### 011_input.rs —— 键盘与鼠标输入
 
-- **操作**：**WASD** 移动方块；**按住空格**看射速统计；**鼠标左键**按住换色。
-- **观察点**：按住空格不放，终端每秒打印一行：
+- **操作**：移动鼠标看方块跟随；按住左键变色；按空格观察计数差别；按 `?` 或 `+` 体验 `Key` 与 `KeyCode`。
+- **观察点**：每秒一行汇总。按住空格不放时：
 
   ```text
-  【最近 1 秒】just_pressed 触发   1 次    pressed 触发  60 次
-  【最近 1 秒】just_pressed 触发   0 次    pressed 触发  61 次
+  【每秒】空格 just_pressed 1 次 / pressed 60 次   鼠标移动 (+12.0, -3.0)   滚轮 +0.0   光标 屏幕 (480, 320) → 世界 (0, 0)
+  【每秒】空格 just_pressed 0 次 / pressed 61 次   ...
+  【每秒】空格 just_pressed 0 次 / pressed 59 次   ...
   ```
 - **要点**：
-  - **`just_pressed` 只在按下的那一帧为真；`pressed` 在按住期间的每一帧都为真。**
-  - 用固定帧长精确复现了一遍（按住 60 帧 × 每帧 1/60 秒）：`just_pressed` 触发 **1** 次、`pressed` 触发 **60** 次 —— 那个 60 就是**帧率**。用 `pressed` 做「按一次做一件事」，等于让帧率决定游戏平衡，换台更快的机器射速就变了。
-  - 三种查询的分工：`pressed` 持续动作（移动、蓄力）/ `just_pressed` 单次动作（射击、跳跃）/ `just_released` 松手动作（蓄力释放）。
-  - `KeyCode` 按**物理位置**匹配 —— 移动键绑定用它；`Key` 按**实际字符**匹配（`Key::Character("?".into())`）—— 符号快捷键用它。
-  - 鼠标的连续输入是 `AccumulatedMouseMotion` / `AccumulatedMouseScroll`；光标位置来自 `Window::cursor_position()`，注意那是**左上角原点、Y 向下**的屏幕坐标（003 讲过的那套），要变世界坐标得过相机（025 讲）。
-  - 只把 `pressed` 换成 `just_pressed` 还不够：想「按住连续射击且射速固定」要用 **`just_pressed` 首发 + `Timer` 冷却接管**（010 的 `Timer`）。
+  - 输入来自**五个资源、两类形态**：
+    `ButtonInput<KeyCode>`（按物理位置）/ `ButtonInput<Key>`（按实际字符）/ `ButtonInput<MouseButton>` / `ButtonInput<GamepadButton>`，
+    以及 `AccumulatedMouseMotion` / `AccumulatedMouseScroll`。
+  - **离散 vs 连续**：按键用 `ButtonInput` 查「这一刻的状态」；鼠标移动和滚轮用 `Accumulated*` 拿「这一帧的增量」，得自己累加。
+  - **按下的三种语义**（本讲核心）：`pressed` 按住期间每帧为真 / `just_pressed` 只在按下那一帧 / `just_released` 只在松开那一帧。
+  - 用固定帧长精确复现了一遍（按住 60 帧 × 每帧 1/60 秒）：`just_pressed` 触发 **1** 次、`pressed` 触发 **60** 次 —— 那个 **60 就是帧率**。
+    用 `pressed` 做「按一次做一件事」，等于让帧率决定游戏平衡：不崩溃、不报警，只是"数值不对"，属于 004 讲的同一类隐性错误。
+  - `KeyCode` vs `Key`：`KeyCode::KeyW` 指"W 那个位置"（**移动键绑定用它**，手感才一致）；
+    `Key::Character("?".into())` 指"打出问号"（**符号快捷键用它**，问号在美式/德语键盘上位置不同，但字符不变）。
+  - 光标位置 `window.cursor_position()` 给的是**屏幕坐标**（左上角原点、Y 向下），再经 `Camera::viewport_to_world_2d` 换算成世界坐标 —— 这正是 003 讲过的两套坐标**正面相遇**的地方。
+  - `Time` / `Timer` 在本讲只是**配角**（把刷屏的输入压成每秒一行），细节在 010；相机本身的玩法（跟随、缩放、分屏）在 025。
 
 ---
 

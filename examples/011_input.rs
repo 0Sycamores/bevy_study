@@ -2,18 +2,23 @@
 //!
 //! 运行：`cargo run --example 011_input`
 //!
-//! 操作：**WASD** 移动方块；**按住空格**看射速统计；**鼠标左键**按住换色。
+//! 本讲**只讲输入本身**：输入从哪几个资源来、怎么查、以及"按下"的三种语义。
+//! 不涉及移动、射击之类的游戏逻辑 —— 那属于别的讲次。
 //!
-//! 本讲的核心是 `pressed` 与 `just_pressed` 的区别 ——
-//! 这是 Bevy 新手最经典的一个 bug，而且它**不会报错**，只会让射速变成帧率。
+//! 操作：移动鼠标看方块跟随（屏幕坐标 → 世界坐标换算）；按住左键变色；
+//! 按空格观察 `just_pressed` 与 `pressed` 的差别；按 `?` 或 `+` 体验 `Key` 与 `KeyCode`。
+//! 每秒会打印一行汇总。
 
+use bevy::input::keyboard::Key;
+// 这两个也不在 prelude 里。
+use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "011 · 输入：WASD 移动 / 按住空格看射速 / 左键换色".into(),
+                title: "011 · 输入：移动鼠标 / 按住左键 / 按空格、? 、+".into(),
                 resolution: (960, 640).into(),
                 ..default()
             }),
@@ -25,23 +30,34 @@ fn main() {
         .add_systems(
             Update,
             (
-                move_player,
-                // 这两个系统都写 Stats，会串行执行；chain 只为输出/计数顺序确定。
-                (fire_by_just_pressed, fire_by_pressed).chain(),
-                report_rate,
-                mouse_buttons,
+                // 这几个都要读写 `Stats`（或与它串行），chain 起来保证顺序确定（004 讲的）。
+                (
+                    cursor_follows_mouse,
+                    collect_mouse_accumulators,
+                    track_space_rate,
+                    report_second,
+                )
+                    .chain(),
+                // 下面几个是只读的离散事件，只在那"一帧"打印，互不冲突。
+                print_key_events,
+                print_char_key_events,
+                print_mouse_button_events,
             ),
         )
         .run();
 }
 
+/// 跟随光标的方块。
 #[derive(Component)]
-struct Player;
+struct CursorMarker;
 
+/// 每秒汇总用的累计量。
 #[derive(Resource, Default)]
 struct Stats {
-    just_pressed_fires: u32,
-    pressed_fires: u32,
+    space_just: u32,
+    space_pressed: u32,
+    motion: Vec2,
+    scroll: f32,
 }
 
 #[derive(Resource)]
@@ -50,164 +66,246 @@ struct ReportTimer(Timer);
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
     commands.spawn((
-        Player,
-        Sprite::from_color(Color::srgb(0.35, 0.62, 0.95), Vec2::splat(80.0)),
+        CursorMarker,
+        Sprite::from_color(Color::srgb(0.35, 0.62, 0.95), Vec2::splat(40.0)),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
+
+    println!("── 操作提示 ──");
+    println!("  移动鼠标：方块跟随（顺便看每秒那行里的「屏幕 → 世界」坐标换算）");
+    println!("  按住左键：方块变橙色");
+    println!("  按住空格：观察 just_pressed 与 pressed 的次数差别");
+    println!("  按 ? 或 + ：体验 Key（按字符匹配）与 KeyCode（按位置匹配）的不同");
+    println!();
 }
 
-/// `pressed` 用于**持续按住**的事情：按住 WASD 就一直移动。
-/// 位移乘 `delta_secs()`，与帧率无关（010 讲的）。
-fn move_player(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut player: Single<&mut Transform, With<Player>>,
-) {
-    let mut direction = Vec2::ZERO;
-    if keyboard.pressed(KeyCode::KeyW) {
-        direction.y += 1.0;
-    }
-    if keyboard.pressed(KeyCode::KeyS) {
-        direction.y -= 1.0;
-    }
-    if keyboard.pressed(KeyCode::KeyA) {
-        direction.x -= 1.0;
-    }
-    if keyboard.pressed(KeyCode::KeyD) {
-        direction.x += 1.0;
-    }
+// ── 鼠标：位置、移动量、滚轮 ────────────────────────────────────────────
 
-    if direction != Vec2::ZERO {
-        // `normalize()` 保证斜着走不会更快
-        let speed = 320.0;
-        player.translation += (direction.normalize() * speed * time.delta_secs()).extend(0.0);
-    }
-}
-
-/// ✅ 正确写法：`just_pressed` 只在按下的**那一帧**为真，
-/// 按住不放也只会触发一次。
-fn fire_by_just_pressed(keyboard: Res<ButtonInput<KeyCode>>, mut stats: ResMut<Stats>) {
-    if keyboard.just_pressed(KeyCode::Space) {
-        stats.just_pressed_fires += 1;
-    }
-}
-
-/// ❌ 错误写法：`pressed` 在**按住期间的每一帧**都为真，
-/// 所以按住空格一秒就会触发约 60 次（60 FPS 下）。
-fn fire_by_pressed(keyboard: Res<ButtonInput<KeyCode>>, mut stats: ResMut<Stats>) {
-    if keyboard.pressed(KeyCode::Space) {
-        stats.pressed_fires += 1;
-    }
-}
-
-/// 每秒汇报一次然后清零 —— 这样数字不会无限涨，比率也看得清。
-fn report_rate(time: Res<Time>, mut timer: ResMut<ReportTimer>, mut stats: ResMut<Stats>) {
-    if timer.0.tick(time.delta()).just_finished() {
-        if stats.pressed_fires > 0 || stats.just_pressed_fires > 0 {
-            println!(
-                "【最近 1 秒】just_pressed 触发 {:>3} 次    pressed 触发 {:>3} 次",
-                stats.just_pressed_fires, stats.pressed_fires
-            );
-        }
-        stats.just_pressed_fires = 0;
-        stats.pressed_fires = 0;
-    }
-}
-
-/// 鼠标键和键盘一样用 `ButtonInput<MouseButton>`。
-/// `just_released` 只在松开的那一帧为真，适合"松手时才结算"的操作（比如蓄力）。
-fn mouse_buttons(
+/// 把光标位置从**屏幕坐标**换算成**世界坐标**，让方块跟着光标走。
+///
+/// 这一行代码正好让 003 讲过的两套坐标正面相遇：
+///   · `window.cursor_position()` 给的是**屏幕坐标**（左上角原点、Y 向下）
+///   · `Transform` 用的是**世界坐标**（屏幕中心原点、Y 向上）
+/// `Camera::viewport_to_world_2d` 就是这次换算的桥。
+fn cursor_follows_mouse(
+    window: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
     mouse: Res<ButtonInput<MouseButton>>,
-    mut player: Single<&mut Sprite, With<Player>>,
+    mut markers: Query<(&mut Transform, &mut Sprite), With<CursorMarker>>,
 ) {
-    if mouse.pressed(MouseButton::Left) {
-        player.color = Color::srgb(0.91, 0.55, 0.25);
+    let Ok((mut transform, mut sprite)) = markers.single_mut() else {
+        return;
+    };
+
+    // 按键状态直接驱动视觉 —— 这就是"输入"最直接的用途。
+    sprite.color = if mouse.pressed(MouseButton::Left) {
+        Color::srgb(0.91, 0.55, 0.25)
     } else {
-        player.color = Color::srgb(0.35, 0.62, 0.95);
+        Color::srgb(0.35, 0.62, 0.95)
+    };
+
+    // 三个都可能"暂时没有"：窗口没了、光标移出窗口、相机还没就绪。
+    // 注意这里用 `single_mut()` 自己处理 Err，而不是 `Single` 参数 ——
+    // 后者在条件不满足时会跳过整个系统（006 讲的），这里不适合。
+    let Ok(window) = window.single() else {
+        return;
+    };
+    let Some(cursor_screen) = window.cursor_position() else {
+        return;
+    };
+    let Ok((camera, camera_transform)) = camera.single() else {
+        return;
+    };
+    if let Ok(world) = camera.viewport_to_world_2d(camera_transform, cursor_screen) {
+        transform.translation = world.extend(0.0);
+    }
+}
+
+/// 鼠标的**连续**输入不在 `ButtonInput` 里，而是两个独立的资源：
+///   · `AccumulatedMouseMotion`   这一帧光标移动了多少（dx / dy）
+///   · `AccumulatedMouseScroll`   这一帧滚轮滚了多少（`delta.y`，另有 `unit` 区分行/像素）
+/// 它们是"增量"，每帧都会重置，所以要自己累加才能做每秒统计。
+fn collect_mouse_accumulators(
+    motion: Res<AccumulatedMouseMotion>,
+    scroll: Res<AccumulatedMouseScroll>,
+    mut stats: ResMut<Stats>,
+) {
+    stats.motion += motion.delta;
+    stats.scroll += scroll.delta.y;
+}
+
+// ── 键盘：两种查询语义 ──────────────────────────────────────────────────
+
+/// 同时统计 `just_pressed` 和 `pressed` 的触发次数，用来量化两者的差别。
+fn track_space_rate(keyboard: Res<ButtonInput<KeyCode>>, mut stats: ResMut<Stats>) {
+    // 只在"按下那一帧"为真
+    if keyboard.just_pressed(KeyCode::Space) {
+        stats.space_just += 1;
+    }
+    // 按住期间"每帧"都为真
+    if keyboard.pressed(KeyCode::Space) {
+        stats.space_pressed += 1;
+    }
+}
+
+/// 键盘的**离散**事件：只在按下/松开的那一帧打印一次。
+///
+///   `just_pressed(..)`   按下那一帧      → 单次动作
+///   `just_released(..)`  松开那一帧      → 松手动作
+///   `pressed(..)`        按住期间每帧    → 持续动作
+fn print_key_events(keyboard: Res<ButtonInput<KeyCode>>) {
+    const WATCHED: [(KeyCode, &str); 4] = [
+        (KeyCode::Space, "空格"),
+        (KeyCode::ArrowUp, "↑"),
+        (KeyCode::ArrowDown, "↓"),
+        (KeyCode::Enter, "回车"),
+    ];
+    for (key, name) in WATCHED {
+        if keyboard.just_pressed(key) {
+            println!("【键盘 KeyCode】{name} 按下");
+        }
+        if keyboard.just_released(key) {
+            println!("【键盘 KeyCode】{name} 松开");
+        }
+    }
+}
+
+/// `ButtonInput<KeyCode>` 按**物理位置**匹配，`ButtonInput<Key>` 按**实际字符**匹配。
+///
+/// 这里查的是 "?" "+" "-" 三个字符 —— 它们在键盘上的位置随布局而变
+/// （美式键盘 ? 在 / 上，德语键盘在 ß 上），但"玩家想打出 ?"这件事不变。
+/// 所以**符号类快捷键用 `Key`**；而 WASD 那种"手感位置"的绑定要用 `KeyCode`。
+fn print_char_key_events(key_input: Res<ButtonInput<Key>>) {
+    for ch in ["?", "+", "-"] {
+        if key_input.just_pressed(Key::Character(ch.into())) {
+            println!("【键盘 Key】字符 {ch} 按下（不管它在键盘哪个位置）");
+        }
+    }
+}
+
+// ── 鼠标按键 ────────────────────────────────────────────────────────────
+
+/// 鼠标键和键盘完全同一套 API，只是资源类型换成 `ButtonInput<MouseButton>`。
+fn print_mouse_button_events(mouse: Res<ButtonInput<MouseButton>>) {
+    const BUTTONS: [(MouseButton, &str); 3] = [
+        (MouseButton::Left, "左键"),
+        (MouseButton::Right, "右键"),
+        (MouseButton::Middle, "中键"),
+    ];
+    for (button, name) in BUTTONS {
+        if mouse.just_pressed(button) {
+            println!("【鼠标】{name} 按下");
+        }
+        if mouse.just_released(button) {
+            println!("【鼠标】{name} 松开");
+        }
+    }
+}
+
+// ── 每秒汇总 ────────────────────────────────────────────────────────────
+
+/// 用 010 讲的 `Timer` 把刷屏的输入压成每秒一行。
+fn report_second(
+    time: Res<Time>,
+    mut timer: ResMut<ReportTimer>,
+    mut stats: ResMut<Stats>,
+    window: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+) {
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
     }
 
-    if mouse.just_released(MouseButton::Left) {
-        println!("【鼠标左键】松开");
-    }
-    if mouse.just_pressed(MouseButton::Right) {
-        println!("【鼠标右键】按下");
-    }
+    let cursor_screen = window
+        .single()
+        .ok()
+        .and_then(|window| window.cursor_position());
+    let cursor_world = cursor_screen.and_then(|position| {
+        let (camera, camera_transform) = camera.single().ok()?;
+        camera.viewport_to_world_2d(camera_transform, position).ok()
+    });
+
+    println!(
+        "【每秒】空格 just_pressed {} 次 / pressed {} 次   鼠标移动 ({:+.1}, {:+.1})   滚轮 {:+.1}   光标 屏幕 {} → 世界 {}",
+        stats.space_just,
+        stats.space_pressed,
+        stats.motion.x,
+        stats.motion.y,
+        stats.scroll,
+        cursor_screen.map_or("窗口外".to_string(), |p| format!(
+            "({:.0}, {:.0})",
+            p.x, p.y
+        )),
+        cursor_world.map_or("—".to_string(), |p| format!("({:.0}, {:.0})", p.x, p.y)),
+    );
+
+    stats.space_just = 0;
+    stats.space_pressed = 0;
+    stats.motion = Vec2::ZERO;
+    stats.scroll = 0.0;
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 按住空格时会看到什么
+// 输入从哪来：五个资源 / 两类形态
 //
-//   【最近 1 秒】just_pressed 触发   1 次    pressed 触发  60 次
-//   【最近 1 秒】just_pressed 触发   0 次    pressed 触发  61 次
-//   【最近 1 秒】just_pressed 触发   0 次    pressed 触发  59 次
+//   Res<ButtonInput<KeyCode>>        键盘，按物理位置        ← 移动键绑定用
+//   Res<ButtonInput<Key>>            键盘，按实际字符        ← 符号快捷键用
+//   Res<ButtonInput<MouseButton>>    鼠标键
+//   Res<ButtonInput<GamepadButton>>  手柄键（另有 Gamepad 轴）
+//   Res<AccumulatedMouseMotion>      鼠标这一帧移动了多少
+//   Res<AccumulatedMouseScroll>      鼠标这一帧滚轮滚了多少
 //
-// 第一秒是 1 次、之后每秒都是 0 次 —— 因为 `just_pressed` 只在按下的那一帧为真，
-// 一直按住也不会再触发。而 `pressed` 每帧都触发，所以数字就是帧率。
+// 形态上分两类，别混：
+//   · **离散**（按键）：用 `ButtonInput` 查询"这一刻的状态"
+//   · **连续**（移动、滚轮）：用 `Accumulated*` 拿"这一帧的增量"，自己累加
 //
-// 又用固定帧长精确复现了一遍（按住空格 60 帧、每帧恰好 1/60 秒）：
+// ─────────────────────────────────────────────────────────────────────
+// 按下有"三种语义"，这是本讲的核心
+//
+//   `pressed(..)`        按住期间**每帧**为真   → 持续动作：加速、蓄力、拖拽
+//   `just_pressed(..)`   只在**按下那一帧**为真  → 单次动作：跳跃、开菜单
+//   `just_released(..)`  只在**松开那一帧**为真  → 松手动作：释放蓄力、结束拖拽
+//
+// 实测（固定帧长精确复现：按住空格 60 帧、每帧恰好 1/60 秒）：
 //
 //   just_pressed 触发 1 次
 //   pressed      触发 60 次
 //
-// 差别一目了然：
-//   · `just_pressed` 只在**按下的那一帧**为真 → 按住一秒也只触发 1 次
-//   · `pressed`     在**按住期间的每一帧**都为真 → 按住一秒触发约 60 次
+// 那个 **60 就是帧率**。实际跑起来，按住空格不放时每秒那行会是这样：
 //
-// 那个 60 就是**帧率**（实测在 59~61 之间浮动，因为帧长不严格等于 1/60 秒）。
-// 换句话说：用 `pressed` 做"按一次做一件事"，等于让帧率决定游戏平衡 ——
-// 换台更快的机器，射速就变了。
+//   【每秒】空格 just_pressed 1 次 / pressed 60 次   ...
+//   【每秒】空格 just_pressed 0 次 / pressed 61 次   ...
+//   【每秒】空格 just_pressed 0 次 / pressed 59 次   ...
 //
-// **所有"按一次做一件事"的逻辑都必须用 `just_pressed`。**
+// 第一秒是 1 次、之后每秒都是 0 次 —— 因为 `just_pressed` 只在按下那一帧为真，
+// 一直按住不会再触发。而 `pressed` 每帧都真，所以数字跟着帧率走。
 //
-// ─────────────────────────────────────────────────────────────────────
-// 三种"按下/松开"查询
+// **所以：所有"按一次做一件事"的逻辑都必须用 `just_pressed`。**
+// 用 `pressed` 的后果不是报错，而是让帧率悄悄决定游戏平衡 ——
+// 换台更快的机器，行为就变了。这类 bug 不崩溃、不报警，只是"数值不对"，
+// 属于 004 讲的同一类隐性错误。
 //
-//   `pressed(..)`        按住期间每帧为真   → 持续动作：移动、蓄力、加速
-//   `just_pressed(..)`   按下那一帧为真      → 单次动作：射击、跳跃、开菜单
-//   `just_released(..)`  松开那一帧为真      → 松手动作：蓄力释放、停止拖拽
-//
-// 不用手动清理它们。装了 `InputPlugin`（`DefaultPlugins` 自带）后，
-// Bevy 会在每帧末自动清掉 `just_*` 状态。
+// 不用手动清理这些状态：装了 `InputPlugin`（`DefaultPlugins` 自带）后，
+// Bevy 会在每帧末自动清掉 `just_*`。
 //
 // ─────────────────────────────────────────────────────────────────────
-// 不只键盘
+// Time、Timer 也在这张图里 —— 但只当配角
 //
-//   `ButtonInput<KeyCode>`        按**物理位置**匹配，不随键盘布局变
-//   `ButtonInput<Key>`            按**实际字符**匹配：`Key::Character("?".into())`
-//   `ButtonInput<MouseButton>`    鼠标键
-//   `ButtonInput<GamepadButton>`  手柄
-//
-// `KeyCode` 与 `Key` 的区别值得说清：
-//   · `KeyCode::KeyW` 永远指"W 所在的那个位置" —— 所以**移动键绑定要用 `KeyCode`**，
-//     玩家的手在哪儿才是他关心的。
-//   · `Key::Character("?")` 指"打出问号"，不管问号在键盘哪个位置 ——
-//     所以**符号类快捷键（? 帮助、+/- 缩放）要用 `Key`**。
+// 本讲为了"每秒汇总一次"用了 `Res<Time>` 和 `Timer`（上面 `report_second`）。
+// 它们**不是**本讲主题，只是把刷屏的输入压成可读的一行；细节都在 010。
+// 同样，方块跟随光标用到的是"光标 → 世界坐标"这个**输入话题**，
+// 相机本身的玩法（跟随、缩放、分屏）是 025。
 //
 // ─────────────────────────────────────────────────────────────────────
-// 鼠标的「移动量」与「光标位置」
+// 一个常见追问：想要"按住连续触发、但速度固定"怎么办
 //
-// 上面只用了鼠标**按键**。鼠标的连续输入是另外两个资源：
+// 光把 `pressed` 换成 `just_pressed` 会变成"按住只触发一次"，
+// 所以真正的需求（按住连续射、但每秒固定 N 发）既不是 `pressed` 也不是
+// `just_pressed` 单独能表达的 —— 它是"首次即时响应 + 之后按固定节奏"：
 //
-//   `Res<AccumulatedMouseMotion>`   这一帧的移动增量（dx / dy），做视角旋转用
-//   `Res<AccumulatedMouseScroll>`   这一帧的滚轮增量（y），做缩放用
+//   按下瞬间 → `just_pressed` 立刻来一发（响应最快）
+//   持续按住 → 后续由冷却计时器接管，射速与帧率无关
 //
-// 光标位置则从窗口拿：
-//
-//   `Query<&Window>` → `window.cursor_position()` → `Option<Vec2>`
-//
-// ⚠️ 它给出的是**屏幕坐标**：左上角原点、Y 向下 —— 正是 003 讲过的
-// "另一套方向相反的坐标"。想变成世界坐标还得过一遍相机，025 讲相机会说。
-//
-// ─────────────────────────────────────────────────────────────────────
-// 那射击到底该怎么写
-//
-// 只把 `pressed` 换成 `just_pressed` 还不够 —— 那样按住不放只有"按下瞬间"发一发。
-// 想要"按住就连续射击、且射速固定"，正确组合是
-// **`just_pressed` 首发 + 冷却计时器接管后续**：
-//
-//   按下瞬间   → 立刻打一发（响应最快）
-//   持续按住   → 由 `Timer` 冷却决定射速，与帧率无关
-//
-// 冷却就是 010 讲的 `Timer`。这套组合旧版 `010_game.rs` 用过，
-// 031 综合游戏会完整用到。
+// 那个冷却就是 010 的 `Timer`，组合写法在 031 综合游戏里完整用到。
+// 本讲只指出这一点，不想把输入讲成"射击教程"。
 // ─────────────────────────────────────────────────────────────────────
