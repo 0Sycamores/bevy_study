@@ -1,0 +1,21 @@
+# 统一换行符为 LF（存储和检出都用 LF）
+#
+# 背景：本仓库此前换行符是混的 —— 新写的例子是 LF，早期文件是 CRLF，
+# 而 core.autocrlf=true 会让每次 git add/commit 都刷一屏
+# "LF will be replaced by CRLF" 警告。此文件把它统一掉。
+
+# 所有文件按内容自动判定是否为文本；文本一律使用 LF
+* text=auto eol=lf
+
+# 显式声明二进制文件，避免以后加入素材时被误当作文本转换
+# （按 CURRICULUM.md 的资产方案，020 起会加入程序化生成的 PNG 与 WAV）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.wav  binary
+*.ogg  binary
+*.mp3  binary
+*.ttf  binary
+*.otf  binary
+*.glb  binary
+*.ico  binary
