@@ -40,6 +40,19 @@ struct Sight(f32);
 #[derive(Component)]
 struct Drift(Vec2);
 
+/// 世界边界的**半宽**（画出来的方框从中心到边线的距离）。
+const WORLD_HALF: f32 = 440.0;
+
+/// 哨兵方块边长。
+const SENTRY_SIZE: f32 = 36.0;
+
+/// 反弹点：让方块的**边缘**正好贴到边界线上。
+///
+/// 这个值必须由 `WORLD_HALF` 和 `SENTRY_SIZE` **算出来**，不能另写一个数 ——
+/// 逻辑边界和画出来的边界一旦各写各的，就会悄悄错开，画面上很难发现。
+/// 这正是 Gizmos 存在的理由：把看不见的边界画出来，不一致才看得见。
+const BOUNCE_AT: f32 = WORLD_HALF - SENTRY_SIZE / 2.0;
+
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
 
@@ -51,7 +64,7 @@ fn setup(mut commands: Commands) {
     ];
     for (x, y, radius, drift) in specs {
         commands.spawn((
-            Sprite::from_color(Color::srgb(0.35, 0.62, 0.95), Vec2::splat(36.0)),
+            Sprite::from_color(Color::srgb(0.35, 0.62, 0.95), Vec2::splat(SENTRY_SIZE)),
             Transform::from_xyz(x, y, 0.0),
             Sight(radius),
             Drift(drift),
@@ -60,6 +73,7 @@ fn setup(mut commands: Commands) {
 
     println!("── 三个哨兵：方块是实体，圈和箭头是 Gizmos 另画的");
     println!("   圈 = 索敌半径，箭头 = 漂移速度，外框 = 世界边界");
+    println!("   反弹点在 ±{BOUNCE_AT}，方块边缘正好贴到 ±{WORLD_HALF} 的线上");
 }
 
 /// 调整 Gizmos 的全局参数。本讲只改线宽，让它看得清楚些。
@@ -70,19 +84,21 @@ fn configure_gizmos(mut store: ResMut<GizmoConfigStore>) {
 }
 
 /// 让哨兵在世界里漂啊漂（碰到边界就反弹）—— 只是给 Gizmos 提供"会动的东西"。
+///
+/// 反弹判据用的是 `BOUNCE_AT`（= 边界线 − 半个方块），所以撞上时**边缘**贴线，
+/// 而不是中心贴在线上、半个身子探出框外。
 fn drift(time: Res<Time>, mut sentries: Query<(&mut Drift, &mut Transform)>) {
-    const BOUND: f32 = 400.0;
     for (mut drift, mut transform) in &mut sentries {
         transform.translation += (drift.0 * time.delta_secs()).extend(0.0);
 
         // 碰到哪个轴就翻转**那个轴**的速度分量，另一个轴保持不变
-        if transform.translation.x.abs() > BOUND {
-            transform.translation.x = transform.translation.x.clamp(-BOUND, BOUND);
+        if transform.translation.x.abs() > BOUNCE_AT {
+            transform.translation.x = transform.translation.x.clamp(-BOUNCE_AT, BOUNCE_AT);
             drift.0.x = -drift.0.x;
             println!("   [反弹] 撞到左右边界，水平速度改为 {:.0}", drift.0.x);
         }
-        if transform.translation.y.abs() > BOUND {
-            transform.translation.y = transform.translation.y.clamp(-BOUND, BOUND);
+        if transform.translation.y.abs() > BOUNCE_AT {
+            transform.translation.y = transform.translation.y.clamp(-BOUNCE_AT, BOUNCE_AT);
             drift.0.y = -drift.0.y;
             println!("   [反弹] 撞到上下边界，垂直速度改为 {:.0}", drift.0.y);
         }
@@ -94,10 +110,11 @@ fn drift(time: Res<Time>, mut sentries: Query<(&mut Drift, &mut Transform)>) {
 /// 它不像精灵那样"生成一次就一直在"：上一帧画的东西下一帧自动清空，
 /// 所以想让某条线一直显示，就得每帧都画一遍。
 fn draw_debug(mut gizmos: Gizmos, sentries: Query<(&Transform, &Sight, &Drift)>) {
-    // ① 世界边界：一个矩形（中心点 + 尺寸）
+    // ① 世界边界：一个矩形。注意 `rect_2d` 的第二个参数是**全宽**（内部会 /2），
+    //    所以这里传 `WORLD_HALF * 2.0`，画出来正好经过 ±WORLD_HALF。
     gizmos.rect_2d(
         Vec2::ZERO,
-        Vec2::splat(880.0),
+        Vec2::splat(WORLD_HALF * 2.0),
         Color::srgb(0.35, 0.38, 0.45),
     );
 
@@ -130,20 +147,24 @@ fn draw_debug(mut gizmos: Gizmos, sentries: Query<(&Transform, &Sight, &Drift)>)
 // 跑起来会看到什么
 //
 //   · 三个蓝方块在世界里漂移，**碰到边界会反弹**（速度取反后往回走）
+//     —— 反弹判据是"方块**边缘**贴到边线"，所以不会半个身子探出框外
 //   · 每个方块外面套一个彩色的圈 —— 那是它的索敌半径（数据本身看不见）
 //   · 每个方块伸出一支黄色箭头 —— 那是它的速度方向与大小
 //     （反弹时箭头会立刻掉头，因为方向数据真的变了）
 //   · 灰白色的外框标出世界边界，中心的十字标出原点
 //
-// 控制台在每次反弹时打印一行（实测 20 秒内 5 次）：
+// 控制台在每次反弹时打印一行（实测 12 秒内 4 次）：
 //
 //   ── 三个哨兵：方块是实体，圈和箭头是 Gizmos 另画的
 //      圈 = 索敌半径，箭头 = 漂移速度，外框 = 世界边界
+//      反弹点在 ±422，方块边缘正好贴到 ±440 的线上
 //      [反弹] 撞到上下边界，垂直速度改为 -55
 //      [反弹] 撞到上下边界，垂直速度改为 30
 //      [反弹] 撞到左右边界，水平速度改为 70
 //      [反弹] 撞到左右边界，水平速度改为 -60
-//      [反弹] 撞到左右边界，水平速度改为 40
+//
+// 顺带注意箭头**会越过边界线**而方块不会 —— 箭头画的是"接下来要往哪走"，
+// 它的长度是 `|速度| × 0.6`，所以尖端本来就领先于方块本身。
 //
 // 值得注意的是：**方块是"实体"，圈和箭头不是。**
 // 你无法用 `Query` 找到那些圈，也无法 `despawn` 它们。
