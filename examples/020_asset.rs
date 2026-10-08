@@ -212,7 +212,7 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 //
 //    解决办法二选一：用 `cargo run` 跑，或者跑之前设好 `BEVY_ASSET_ROOT`：
 //
-//      $env:BEVY_ASSET_ROOT = (Get-Location).Path     # PowerShell
+//      export BEVY_ASSET_ROOT=$(pwd)
 //
 // 本项目 `assets/` 下的文件全部由脚本生成，没有下载来的二进制：
 //

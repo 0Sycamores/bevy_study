@@ -28,7 +28,7 @@ cargo check --examples
 
 首次编译 Bevy 比较慢（需要编译渲染后端），之后的增量编译很快。
 
-> Windows / PowerShell 下设置日志用：`$env:RUST_LOG="info"; cargo run --example 008_message`
+> 跑某个例子时如果要在**别处**找 `assets/`，用环境变量 `BEVY_ASSET_ROOT` 指定（见 [020_asset.rs](examples/020_asset.rs)）。
 
 ---
 
