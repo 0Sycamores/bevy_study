@@ -8,7 +8,7 @@
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
 > ⚠️ **课程仍在推进中。** 完整规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一~五已完成（001–026）。**
+> **当前进度：阶段一~六已完成（001–030）。**
 
 ---
 
@@ -75,6 +75,10 @@ cargo check --examples
 | 024 | [024_audio.rs](examples/024_audio.rs) | 音频：`Pitch` 程序合成，`AudioSink` 运行中控制 |
 | 025 | [025_camera.rs](examples/025_camera.rs) | 相机：`Viewport` 分屏、正交缩放 |
 | 026 | [026_gizmos.rs](examples/026_gizmos.rs) | Gizmos：把看不见的半径与速度画出来 |
+| 027 | [027_3d_basic.rs](examples/027_3d_basic.rs) | 3D 基础：`Camera3d` + 网格 + 材质 + 光 |
+| 028 | [028_3d_gltf.rs](examples/028_3d_gltf.rs) | 加载 glTF：场景是一棵实例化出来的实体树 |
+| 029 | [029_3d_picking.rs](examples/029_3d_picking.rs) | 3D 拾取：`MeshPickingPlugin` 必须手动加 |
+| 030 | [030_shader.rs](examples/030_shader.rs) | 自定义 WGSL 材质：uniform 传参 |
 
 ---
 
@@ -626,6 +630,93 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - `TransformGizmo` 那种"拖拽手柄"是编辑工具，跟本讲的调试绘制不是一回事。
 
 ---
+### 027_3d_basic.rs —— 3D 基础
+
+- **观察点**：一块地面上摆着蓝色立方体（自转）、橙色球、绿色圆柱，两个光源投出阴影。
+
+  ```text
+  ── 3D 场景：地面 + 立方体(会转) + 球 + 圆柱
+     相机位置 Vec3(-4.5, 4.0, 9.0)
+     相机朝向 Dir3(Vec3(0.42368072, -0.32011428, -0.84736145))   ← 注意 z 是负的
+  ```
+- **要点**：
+  - ★ **2D 和 3D 用的是同一个 `Transform`，但 z 的含义完全不同**：2D 里 z 是**层序**（谁盖住谁），3D 里 z 是**纵深**（离相机多远）。所以 `from_xyz(0,0,5)` 在 2D 是"提到最上层"，在 3D 是"朝相机挪 5 个单位"。
+  - 3D 物体三件套：`Mesh3d`（形状）+ `MeshMaterial3d`（表面）+ `Transform`，两者都是**句柄** → 多个物体可共用一份网格/材质。
+  - ⚠️ 缺必需组件**不报错，只是看不见**（和 003 的"窗口 ≠ 画面"同类）。
+  - 相机姿态用 `looking_at(目标, 上方向)`；那个 `up` 不能省 —— 只给"看哪里"确定不了姿态（相机还能绕视线自转）。
+  - ⚠️ 两处 0.19 改名：环境光资源是 **`GlobalAmbientLight`**（`AmbientLight` 现在是挂相机上覆盖用的**组件**）；光源开阴影的字段是 **`shadow_maps_enabled`**（旧版 `shadows_enabled`）。
+  - 相机朝向那个数可以自己算：`looking_at` 的方向就是**目标 − 位置**归一化。相机在 x=−4.5 看原点，所以 x 分量是**正**的。
+
+---
+
+### 028_3d_gltf.rs —— 加载 glTF 模型
+
+- **观察点**：文件里只有 3 个节点，实例化出来是 6 个实体：
+
+  ```text
+  ── assets.load("models/pyramid.gltf#Scene0") 已返回句柄
+     第 1 帧：场景里带 Mesh3d 的实体 0 个
+     [WorldInstanceReady] 实例化完成，根实体 375v0
+        ├─ 382v0  PyramidPair
+        ├─ 377v0  Root
+        ├─ 378v0  PyramidA
+        ├─ 379v0  PyramidB
+        ├─ 380v0  Pyramid.PyramidMaterial  [有网格]
+        ├─ 381v0  Pyramid.PyramidMaterial  [有网格]
+  ```
+- **要点**：
+  - `WorldAssetRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("x.gltf")))`；也可以直接写 `"x.gltf#Scene0"`。
+  - ★ **场景不是一个实体，而是一次实例化请求**：spawn 出来的那个是"根"，内容作为它的**后代**展开。操作场景要走 `Children::iter_descendants(root)`。
+  - ★ **不能立刻查**：加载是异步的（020），在 `Startup` 里 spawn 完紧接着 `Query` 必然是空的，**而且不报错**。正确时机是 `On<WorldInstanceReady>` 观察者（注意这个事件**不在 prelude**，要 `use bevy::world_serialization::WorldInstanceReady`）。
+  - ★ **节点 ≠ 网格实体**：命名节点上**没有** `Mesh3d`，真正的网格是它的**子实体**（名字按"网格名.材质名"拼）。所以"按节点名找到实体再改材质"会**静默失败** —— 得先找节点、再往下走一层。多出来的三个实体是：glTF 的 scene 本身 + 每个网格图元各一个。
+  - 资产 `assets/models/pyramid.gltf` 是 `tools/make_assets.py` **手写生成**的：glTF 就是 JSON，二进制用 base64 内嵌。手写一遍能看清顶点、法线、绕序这些平时被工具藏起来的东西。
+
+---
+
+### 029_3d_picking.rs —— 3D 拾取与轨道相机
+
+- **观察点**：启动输出两行；之后需要真实鼠标操作（**机器验证不了**）：
+
+  ```text
+  ── MeshPickingPlugin 已启用；三个物体挂上了 Over/Out/Click 观察者
+     左键点物体、右键拖动转视角、滚轮拉近拉远
+  ```
+- **要点**：
+  - ★ **`MeshPickingPlugin` 必须手动加**。UI 拾取（023）与 2D 精灵拾取是**默认开启**的，3D 网格拾取不是 —— 不加的话观察者**一个都不触发，且零警告零错误**。
+    本条已实测确认：临时注释掉那一行后，程序照常启动，stderr 完全为空。所以排查"点了没反应"的第一步永远是：**拾取后端装了吗？**
+  - 拾取背后是引擎替你做的射线求交（屏幕坐标 → 世界射线 → 与网格求交 → 取最近 → 生成带目标的实体事件）。要自定义命中信息才需要自己拿 `Camera::viewport_to_world`。
+  - **观察者挂哪一层**（承接 028）：代码 spawn 的物体 `Mesh3d` 与观察者同实体即可；glTF 那种"节点 + 子网格"两层结构要按需选一层。
+  - 轨道相机用**球坐标**（yaw/pitch/radius）描述，天然满足"永远看着焦点"；`pitch` 要限制在 ±90° 内，否则 `look_at` 的上方向会退化、画面翻转。
+  - **左键选中、右键转视角**：两种操作要分开，否则拖一下会连发一堆 `Click`。
+
+---
+
+### 030_shader.rs —— 自定义着色器
+
+- **观察点**：三个物体表面有斜向条纹并缓慢呼吸（`params.x` 由 Rust 每帧更新），旁边地面用自带材质作对照。
+
+  ```text
+  ── 自定义材质 GlowMaterial 已注册（MaterialPlugin）
+     shader 来自 shaders/glow.wgsl；三个物体用条纹 + 呼吸着色
+  ```
+- **要点**：
+  - Rust 侧：`#[derive(Asset, TypePath, AsBindGroup)]` + `#[uniform(N)]` 字段 + `impl Material { fn fragment_shader() -> ShaderRef }`，注册用 `MaterialPlugin::<M>::default()`。
+  - ★ **`@group` 的编号不能写死** —— 这是本讲最大的坑。初版按老写法写 `@group(2)`，编译正常、**一跑就炸**：
+
+    ```text
+    Validation Error: Shader global ResourceBinding { group: 2, binding: 0 }
+    is not available in the pipeline layout
+      Storage class Storage { .. } doesn't match the shader Uniform
+    Quitting the application due to Validation RenderError
+    ```
+
+    0.19 里材质 bind group 的编号是引擎按启用的特性**动态决定**并注入的（看 `pbr_bindings.wgsl` 里写的是 `#{MATERIAL_BIND_GROUP}`）。正确写法是同样用预处理器变量。**凡和管线布局有关的编号，优先找引擎的变量，别抄字面量。**
+  - ⚠️ **忘了 `MaterialPlugin`** → 编译能过、程序能跑、日志干净，就是**画面上什么都没有**。
+  - Rust 与 WGSL 是**两份要手动对齐的契约**（类型、binding 号、`#import` 路径），对不上大多是**运行时**才暴露。调试顺序：先看终端有没有 shader 校验错误 → 再确认插件装了没 → 最后把 fragment 改成返回纯品红，能看见就说明管线通了。
+  - ⚠️ **热重载在本项目不可用**（`file_watcher` 在 `dev` 组里、不在默认，且开启要下载依赖），所以改 shader 必须重新 `cargo run`。另一种做法是 `embedded_asset!` 把 WGSL 编进二进制（发布常用，代价是彻底没有热重载）。
+  - `assets/shaders/glow.wgsl` 是**手写源码**（不像 `textures/`、`models/` 是脚本生成的），放在 `assets/` 下是因为 `ShaderRef::path(..)` 的基准就是它。
+
+---
 ## 常见坑速查
 
 | 现象 | 原因 |
@@ -652,6 +743,12 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 | UI 里的中文不显示 / 刷 ICU4X 警告 | Bevy 默认字体是 `FiraMono-subset`，**不含中文字形**，必须自带中文字体（见 022） |
 | 正交相机缩放方向搞反 | `scale` 是**视野**的倍数：`scale` 越大看得越广、东西越**小**（见 025） |
 | 播 `.wav` 直接 panic | 默认 `audio` feature 只带 `vorbis`（OGG）。播 WAV 要开 `wav`（依赖 hound），或用 `Pitch` 程序合成（见 024） |
+| 3D 物体点了没反应、且不报错 | 3D 网格拾取要手动加 `MeshPickingPlugin`（UI / 2D 精灵拾取才默认开启）（见 029） |
+| glTF 里"按节点名找到实体，改它却没反应" | 命名节点上**没有** `Mesh3d`，真正的网格是它的**子实体**（名字形如 `Mesh.Material`），要往下再走一层（见 028） |
+| 自定义 shader 运行时校验失败：`group: 2 not available in the pipeline layout` | group 编号**不能写死**：用 `@group(#{MATERIAL_BIND_GROUP})`，引擎会注入（见 030） |
+| 自定义材质"什么都看不见"也不报错 | 忘了 `MaterialPlugin::<M>::default()` 注册材质类型（见 030） |
+| 环境光设了没效果 | 0.19 里 `AmbientLight` 是**组件**（挂相机上覆盖）；全局资源叫 `GlobalAmbientLight`（见 027） |
+| 光源开阴影没反应 | 字段名是 `shadow_maps_enabled`，不是旧版的 `shadows_enabled`（见 027） |
 | 插件之间改了数据却看不到效果 | 跨插件的顺序也要显式声明：`SystemSet` + `configure_sets`（见 016） |
 | `init_state` 处 panic：`StateTransition schedule is missing` | 没装 `StatesPlugin`。`DefaultPlugins` 自带；只用 `LogPlugin` 时要显式补（见 019） |
 | 切换状态后当帧读到的还是旧状态 | `set()` 只是**请求**，切换在**帧末**的 `StateTransition` 里（见 018） |

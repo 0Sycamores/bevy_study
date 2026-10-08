@@ -265,25 +265,25 @@
 
 ### 阶段六 · 3D 与渲染（027–030）
 
-#### 027 `027_3d_basic.rs` — 3D 基础
+#### 027 `027_3d_basic.rs` — 3D 基础 ✅ 已实现
 - **目标**：把 2D 的直觉搬到 3D。
 - **核心 API**：`Camera3d`、`Mesh3d(handle)`、`MeshMaterial3d::<StandardMaterial>(handle)`、`Assets<Mesh>::add(Cuboid::new(..))`、`PointLight`/`DirectionalLight`（含阴影）、`Transform` 的 3D 旋转。
 - **观察点**：2D 里"原点中心 + y 向上 + z 定层序"，3D 里 z 变成**纵深**，`Camera3d` 默认朝 `-z` 看——同一套 `Transform` 组件语境的差异。
 - **前置**：003、025。
 
-#### 028 `028_3d_gltf.rs` — 加载 glTF 模型
+#### 028 `028_3d_gltf.rs` — 加载 glTF 模型 ✅ 已实现
 - **目标**：用美术做好的模型，而不是代码拼几何体。
 - **核心 API**：`WorldAssetRoot(handle)`（**0.19 改名，旧名 `SceneRoot`**）、`AssetServer::load` + `GltfAssetLabel::Scene(0)`、`Scene`/`SceneInstance`、glTF 动画播放（`AnimationPlayer`/`AnimationGraph`）。
 - **观察点**：glTF 场景**不是**一个实体，而是一棵被实例化出来的实体树；想改其中的材质要用 `SceneInstance` 就绪后再查，不能立刻 `Query`。
 - **前置**：020、027。
 
-#### 029 `029_3d_picking.rs` — 3D 拾取与相机控制
+#### 029 `029_3d_picking.rs` — 3D 拾取与相机控制 ✅ 已实现
 - **目标**：鼠标点到 3D 物体上。
 - **核心 API**：`MeshPickingPlugin`（**非默认插件，必须手动加**；UI/Sprite 拾取则是默认开启的）、`Pointer<Over>`/`Pointer<Click>`/`Pointer<Drag>`、射线、`Camera::viewport_to_world`、围绕点旋转的轨道相机。
 - **观察点**：不加 `MeshPickingPlugin` 时观察者**完全不触发**（不报错），这是最难查的一类问题。
 - **前置**：013、027。
 
-#### 030 `030_shader.rs` — 自定义着色器
+#### 030 `030_shader.rs` — 自定义着色器 ✅ 已实现
 - **目标**：写出自己的 WGSL 材质。
 - **核心 API**：`Material` trait + `AsBindGroup`、`ShaderRef`、`MaterialPlugin`、`embedded_asset!`、uniform 传参、`example.com` 的 WGSL 入口约定。
 - **观察点**：改 WGSL 存盘 → 热重载即时生效（不用重编译 Rust）；Rust 侧只负责传 uniform。
@@ -419,6 +419,13 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | 又一批不在 prelude 的类型 | `Viewport` → `bevy::camera::Viewport`；`PlaybackMode` / `Volume` → `bevy::audio::{..}`；`AccumulatedMouseScroll` → `bevy::input::mouse::..`；`GizmoConfigStore` / `DefaultGizmoConfigGroup` → `bevy::gizmos::config::{..}` | 024–026 |
 | `observe(..)` 不是 bundle | 它是 `EntityCommands` 的方法（也导出一个 `EntityCommand`），**不能**写进 `children![..]`。要挂观察者的子实体得先 `spawn` 再 `.observe(..)` | 023 |
 | UI 交互不要用 `Interaction::Pressed` 当"点击" | `Pressed` 在按住期间**持续为真**（与 011 的 `pressed` 同理）。要单次触发，用 `Changed<Interaction>` 过滤，或改用 `On<Pointer<Click>>` 观察者 | 023 |
+| 3D 网格拾取必须手动装插件 | `MeshPickingPlugin` **不是**默认插件（UI / 2D 精灵拾取才是）。不加时观察者完全不触发，且 **stderr 无任何 WARN/ERROR**（已实测：临时注释该行后程序照常启动、stderr 为空） | 029 |
+| glTF 的节点 ≠ 网格实体 | glTF 里带 `Mesh3d` 的是命名节点的**子实体**（名字形如 `Pyramid.PyramidMaterial`）。按节点名直接改材质会**静默失败**。文件 3 个节点实例化出 6 个实体（scene 本身 + 每个图元各一个） | 028 |
+| `WorldInstanceReady` 不在 prelude | 要 `use bevy::world_serialization::WorldInstanceReady`。另注意 `WorldAssetRoot` 装的是 `Handle<WorldAsset>`，旧名 `SceneRoot` | 028 |
+| 环境光 0.19 改名 | `GlobalAmbientLight` 是**资源**（全局默认）；`AmbientLight` 现在是挂相机上覆盖用的**组件** | 027 |
+| 光源开阴影的字段名 | `shadow_maps_enabled`（旧版叫 `shadows_enabled`） | 027 |
+| 自定义 shader 运行时校验失败 | `@group` 编号**不能写死**。0.19 里材质 bind group 由引擎按特性动态决定并注入，须写 `@group(#{MATERIAL_BIND_GROUP})`。写死 `2` 会撞到 storage buffer，报 `ResourceBinding { group: 2, binding: 0 } is not available in the pipeline layout` 并 `Quitting the application due to Validation RenderError` | 030 |
+| 自定义材质什么都不显示也不报错 | 忘了 `MaterialPlugin::<M>::default()` | 030 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
@@ -436,7 +443,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | M3 阶段三 | 015 跑完，能用观察者替代消息、说清变更检测省下了什么 | ✅ 已完成（013–015 全部落地并实跑验证） |
 | M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ✅ 已完成（016–019 全部落地并实跑验证） |
 | M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ✅ 已完成（020–026 全部落地并实跑验证） |
-| M6 阶段六 | 030 跑完，能加载 glTF 并写自定义 WGSL 材质 | ⏳ |
+| M6 阶段六 | 030 跑完，能加载 glTF 并写自定义 WGSL 材质 | ✅ 已完成（027–030 全部落地并实跑验证） |
 | M7 阶段七 | 033 跑完，有一个可测试、可剖析、可发布的小游戏 | ⏳ |
 
 > 阶段一（001–004）的实施备注：
@@ -522,3 +529,22 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 >   本讲 UI 文本因此统一改成 ASCII，并把"要自带中文字体"写成例子里的重点提示。
 > - 025 是本阶段唯一"没有输入也能看"的一讲：用 `Viewport` 把同一份世界画在左右两半，
 >   左相机可滚轮缩放 —— 一眼看出 `scale` 是"视野倍数"而不是"物体倍数"。
+> 阶段六（027–030）的实施备注：
+> - 本轮又纠正了四处会让"照着老教程写跑不起来"的 0.19 变更，全部写进例子与 4.5：
+>   ① 环境光拆成 `GlobalAmbientLight`（资源）+ `AmbientLight`（组件）；
+>   ② 光源阴影字段改名 `shadow_maps_enabled`；
+>   ③ **glTF 的节点与网格是两个实体**（本讲第一版按节点名改材质，静默失败，
+>      跑起来看输出才发现）；
+>   ④ **WGSL 里材质 bind group 的编号不能写死** —— 初版写 `@group(2)`，
+>      编译正常但一跑就 `Validation Error` 并退出。引擎自己的 `pbr_bindings.wgsl`
+>      用的是预处理器变量 `#{MATERIAL_BIND_GROUP}`，跟着改才对。
+> - 028 的 glTF 素材由 `make_pyramid_gltf()` **手写生成**（三节点树、18 顶点、
+>   6 三角形、base64 内嵌 432 字节缓冲），不依赖任何 3D 工具 ——
+>   顺带把顶点、法线、绕序这些平时被工具藏起来的东西摊开了。
+>   glTF 动画**未现场演示**：0.19 播动画还需 `AnimationGraphHandle`（一套动画图），
+>   主体是"动画系统"而非"加载 glTF"，按原则第 8 条留给后续；
+>   素材里也没有动画，注意力集中在"场景 = 实体树"。
+> - 029 的交互部分**机器验证不了**（需要真实鼠标），已如实标注；但"不加插件会静默失效"
+>   这一条用 A/B（临时注释插件行）实测确认了 stderr 为空。
+> - 030 的热重载**在本项目不可用**（`file_watcher` 属 `dev` 组、开启需下载依赖），
+>   文末已如实说明，并给出 `embedded_asset!` 的替代路径。
