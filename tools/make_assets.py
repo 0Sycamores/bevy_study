@@ -392,7 +392,9 @@ def main() -> None:
     targets.append(runner_path)
 
     gltf_path = MODELS / "pyramid.gltf"
-    gltf_path.write_text(make_pyramid_gltf(), encoding="utf-8")
+    # `newline="\n"` 是必须的：Windows 上 write_text 默认会把 \n 转成 \r\n，
+    # 而本项目统一用 LF（见 .gitattributes）
+    gltf_path.write_text(make_pyramid_gltf(), encoding="utf-8", newline="\n")
     targets.append(gltf_path)
 
     print("已生成：")
