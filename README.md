@@ -8,7 +8,7 @@
 - 所有例子在 `examples/` 下，每个都能单独运行；`src/main.rs` 只是一个指针，运行它会提示去看 examples
 
 > ⚠️ **课程仍在推进中。** 完整规划见 [`CURRICULUM.md`](CURRICULUM.md)：33 讲 / 7 个阶段。
-> **当前进度：阶段一~四已完成（001–019）。**
+> **当前进度：阶段一~五已完成（001–026）。**
 
 ---
 
@@ -68,6 +68,13 @@ cargo check --examples
 | 017 | [017_module/](examples/017_module/) | 多文件工程结构（**目录式 example**） |
 | 018 | [018_states.rs](examples/018_states.rs) | 状态机：`OnEnter` / `OnExit` / `in_state` |
 | 019 | [019_state_advanced.rs](examples/019_state_advanced.rs) | 状态进阶：子状态、`DespawnOnExit` 自动清理 |
+| 020 | [020_asset.rs](examples/020_asset.rs) | 资产加载：`load` 是异步的，先占位后替换 |
+| 021 | [021_atlas_animation.rs](examples/021_atlas_animation.rs) | 图集与帧动画：一张图切 6 帧 |
+| 022 | [022_ui.rs](examples/022_ui.rs) | UI 布局：flex 排版，坐标原点在左上角 |
+| 023 | [023_ui_interaction.rs](examples/023_ui_interaction.rs) | UI 交互：轮询 vs 观察者对写 |
+| 024 | [024_audio.rs](examples/024_audio.rs) | 音频：`Pitch` 程序合成，`AudioSink` 运行中控制 |
+| 025 | [025_camera.rs](examples/025_camera.rs) | 相机：`Viewport` 分屏、正交缩放 |
+| 026 | [026_gizmos.rs](examples/026_gizmos.rs) | Gizmos：把看不见的半径与速度画出来 |
 
 ---
 
@@ -508,6 +515,117 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 
 ---
 
+### 020_asset.rs —— 资产加载
+
+- **观察点**：三个精灵刻意做对照 —— 左=拿到句柄直接用、右=先占位后替换、下=加载一个**不存在**的路径：
+
+  ```text
+  ── assets.load("textures/logo.png") 已返回句柄（内容此刻还没到）
+     第 1 帧  LoadState = Some(Loaded)
+     第 1 帧：内容到位，右边从占位方块换成真图
+     [AssetEvent] Added    —— 图片加载完成
+  ```
+- **要点**：
+  - **`load` 是异步的，返回的只是"取货凭证"（`Handle`）**。判断内容到了没有：`Assets::get(handle)` 为 `None` 就是还没到；`AssetServer::is_loaded_with_dependencies(..)` 连依赖一起算；`get_load_state(..)` 想知道卡在哪一步。
+  - ⚠️ **`LoadState::Failed` 不会 panic**，只是永远不 `Loaded` —— 最典型的表现是"东西一直不出现，程序也不报错"。本讲第三个精灵就是这种情况（终端只会有一行 ERROR）。
+  - ⚠️ **本机实测第 1 帧就 `Loaded`**（1.7 KB 小图 + SSD，读盘比第一帧还快），所以"Loading"那段没被观察到。但这**不是省掉判断的理由** —— 换大模型/机械盘/Web 端，等待就是几帧甚至几秒。
+  - ⚠️ **`assets/` 的根按顺序确定**：`BEVY_ASSET_ROOT` → `CARGO_MANIFEST_DIR`（`cargo run` 自动设置）→ **可执行文件所在目录**。所以直接双击 exe 跑会去 `target/debug/examples/assets/` 找，全找不到。
+  - ⚠️ **热重载要 `file_watcher` feature，它不在默认里**（默认只有 `2d/3d/ui/audio`），而在 `dev` 组：`dev = ["debug", "bevy_dev_tools", "file_watcher"]`。本项目没开，实测改 PNG 等 10 秒也没有 `Modified`。
+
+---
+
+### 021_atlas_animation.rs —— 图集与帧动画
+
+- **观察点**：三个小人并排 —— 甲 6fps、乙 12fps、丙定在第 4 帧不动。控制台打印跑圈：
+
+  ```text
+  ── textures/runner.png 是 288x48，按 48x48 切成 6 帧
+     乙 12fps 跑完第 1 圈（6 帧）
+     甲 6fps 跑完第 1 圈（6 帧）
+  ```
+- **要点**：
+  - **`TextureAtlasLayout` 管"怎么切"，`TextureAtlas.index` 管"用第几格"**。前者可共享（克隆句柄即可），后者**每个精灵各一份** —— 所以三个精灵共用一张图和一份布局，却各演各的。
+  - `TextureAtlasLayout::from_grid(每格尺寸, 列数, 行数, padding, offset)` 存进 `Assets<TextureAtlasLayout>`。
+  - 动画逻辑只有几行：`Timer` 到点 → `index + 1` → 到末尾回 0（复用 010 的 `Timer`）。
+  - ⚠️ **像素图必须加 `ImagePlugin::default_nearest()`**，否则线性插值会把硬边糊成渐变。
+  - `Sprite::from_atlas_image(..)` 建出来的精灵，图集信息挂在 `sprite.texture_atlas`（是 `Option`）—— 所以帧动画精灵和普通精灵是同一个组件类型。
+
+---
+
+### 022_ui.rs —— UI 布局
+
+- **观察点**：左上角一张图片、右上角文字「HP xx」、底部中间一条血条（每 0.4 秒变化一次）。
+- **要点**：
+  - ★ **UI 是另一套坐标系**：原点在**左上角**、Y 轴**向下**、单位是**逻辑像素**。跟 003 的精灵世界坐标（中心原点、Y 向上）正好相反。
+  - UI 是**排版**不是摆坐标：`Node` 用 flexbox（`flex_direction` / `justify_content` / `align_items` / `padding` / `row_gap`），本讲的血条就是用 `Column + FlexEnd + Center` 推到"底部居中"，**没有一个坐标是手算的**。
+  - `position_type: Absolute` 可以让元素脱离排版流、回到"按 `top/left/right/bottom` 钉死"（本讲的图片与文字就是）。
+  - ⚠️ **中文字体**：Bevy 默认字体是 `FiraMono-subset.ttf`（拉丁字母），**不含汉字字形**。直接 `Text::new("血量")` 会刷 `ICU4X data error: No segmentation model for complex script` 而且画面上出不来字。必须自带中文字体（系统字体或放进 `assets/fonts/`）。
+    注意区分：**`println!` 的字由终端画，`Text` 的字由 Bevy 画** —— 前者什么语言都行。
+  - `ZIndex` 管 UI 内部层叠，和精灵的 `Transform.z` 是两套体系；UI 本身始终渲染在世界之上。
+  - 别每帧无脑刷新 UI —— 用 015 的 `is_changed()`（本讲的 `update_hud` 就是这么写的）。
+
+---
+
+### 023_ui_interaction.rs —— UI 交互
+
+- **观察点**：两个按钮外观与行为一致，但实现路子完全不同 —— 左边轮询、右边观察者。控制台分别打印：
+
+  ```text
+  [轮询]   按下 → 累计 1 次
+  [观察者] 点到实体 7v0 → 累计 1 次
+  ```
+- **要点**：
+
+  | | `Changed<Interaction>` 轮询 | `On<Pointer<..>>` 观察者 |
+  |---|---|---|
+  | 系统数量 | **1 个**就管完外观三态 + 计数 | 外观三态要 **4~5 个**观察者 |
+  | 开销 | 每帧遍历所有按钮（有 `Changed` 过滤） | 只在该实体出事时跑 |
+  | 能拿到持续状态 | ✅ `Hovered` / `Pressed` | ❌ 只有事件 |
+  | 语义 | "按下"（不含松开） | "点击"（按下+松开同实体） |
+
+  经验：**外观用轮询、动作触发用观察者**，混用没问题。
+  - ⚠️ **别拿 `Interaction::Pressed` 当"点击"** —— 它按住期间**持续为真**（和 011 的 `pressed` 一样）。本讲用 `Changed<Interaction>` 过滤掉了重复帧。
+  - ⚠️ `observe(..)` **不是 bundle**，不能写进 `children![..]` —— 它是 `EntityCommands` 的方法，要先 `spawn` 再挂（本讲的观察者按钮就是这么建的）。
+  - 0.19 里 **UI 与精灵的指针拾取默认开启**；3D 网格拾取才需要手动加 `MeshPickingPlugin`（029 讲）。
+
+---
+
+### 024_audio.rs —— 音频
+
+- **观察点**：一进画面就有 0.5 秒一拍的琶音；空格加一声音效；M 立刻静音/恢复，并打印改了几个正在播放的声音。
+- **要点**：
+  - **两个组件分工**：`PlaybackSettings` 是**开播参数**（开始后改它无效）；`AudioSink` 是**播放句柄**（运行中调音量/暂停/停止靠它）。本讲的静音开关两样都用 —— 只改资源，新音符会漏出来；只改 sink，下一个音符又用旧音量。
+  - `PlaybackMode`：`Once` / `Loop`（BGM）/ `Despawn`（音效，播完自动销毁实体）/ `Remove`。
+  - ⚠️ `Once` 播完后 **`AudioPlayer` 不能复用**，要重播得摘掉组件再加回去。所以短音效的标准做法是**每次 spawn 一个临时实体**（本讲就是），天然支持多声重叠。
+  - ⚠️ **默认只支持 OGG，不支持 WAV**：`audio = ["bevy_audio", "vorbis"]`。拿 `.wav` 去播会在解码处**直接 panic**（`audio_source.rs:101`）。要 WAV 得开 `wav` feature（引入 `hound`），全套格式用 `audio-all-formats`。
+  - 本讲因此改用 **`Pitch` 程序合成音**（给频率 + 时长就有声音，不需要音频文件、不需要额外 feature）。注意两种构造方式的区别：文件走 `AudioPlayer::new(handle)`，`Pitch` 走 `AudioPlayer(handle)`。
+
+---
+
+### 025_camera.rs —— 相机
+
+- **观察点**：窗口左右两半**显示同一份世界** —— 左相机 `scale=1.0`，右相机 `scale=2.0`（视野宽两倍，东西看起来小一半）。滚轮调整左相机，左上角文字实时显示 scale。
+- **要点**：
+  - ★ **`scale` 是"视野"的倍数，不是"物体"的倍数**：`scale` 越大 → 视野越广 → 东西越**小**。直观理解是"相机往后退了几倍"，所以想放大画面要**减小** scale。
+  - **`Viewport { physical_position, physical_size }`** 把相机输出限制在屏幕一块矩形里 —— 分屏就靠它。注意单位是**物理像素**，写死 `480` 只在 960 宽窗口下正确，真实项目该按 `window.physical_width()` 算。
+  - 每台相机都要有 `Camera2d`（或 `Camera3d`），`Camera` 组件只是配置；多相机同屏用 `Camera.order` 决定绘制顺序。
+  - **跟随的两种做法**：① 把相机挂成目标的**子实体**（014 的层级，一行搞定但生硬）；② 每帧**插值逼近**（有跟随感，但要自己处理边界）。多数游戏要 ②。
+  - 世界坐标 ⇄ 屏幕坐标靠 `viewport_to_world_2d` / `world_to_viewport`（011 讲光标时用过前者）。
+
+---
+
+### 026_gizmos.rs —— Gizmos 调试绘制
+
+- **观察点**：三个蓝方块漂移，每个外面套一个彩色圈（索敌半径）、伸出一支黄色箭头（速度）；外框是世界边界、中心十字是原点。
+- **要点**：
+  - ★ **Gizmos 只活一帧** —— 图形在下一帧开始时会全部清空，所以**必须每帧重画**。这跟精灵正好相反：精灵 spawn 一次就一直在，想让它消失要 `despawn`；Gizmos 是"想让它消失就这一帧别画"。
+  - 因此"开关调试显示"只需要一个 `if`，不需要管理实体。
+  - 常用方法：`line_2d` / `circle_2d` / `rect_2d` / `arrow_2d` / `linestrip_2d`（3D 版把 `_2d` 换成 `_3d`）。
+  - `GizmoConfigStore` 管全局参数：本讲把 `config.line.width` 从默认的 1 改成 3（高分屏上 1 像素基本看不见）；还有 `config.enabled`（整体开关）、`config.depth_bias`（与场景重叠）等。
+  - ⚠️ 别拿 Gizmos 做正式美术 —— 它是调试工具，线宽/颜色/层级都不适合最终画面。
+  - `TransformGizmo` 那种"拖拽手柄"是编辑工具，跟本讲的调试绘制不是一回事。
+
+---
 ## 常见坑速查
 
 | 现象 | 原因 |
@@ -528,6 +646,12 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 | 子实体没跟着动 / 位置算不对 | `Transform` 是**局部**的，世界坐标在只读的 `GlobalTransform`；且父的**缩放会逐级相乘**（见 014） |
 | despawn 一个节点后子树也没了 | 销毁父实体会**连带销毁整棵子树**（见 014） |
 | 观察者里的改动要等下一帧才生效 | `commands.trigger` 是延迟的，观察者在同步点才跑（见 013） |
+| 直接跑 `target/debug/examples/xxx.exe` 时资产全找不到 | `assets/` 的根按 `BEVY_ASSET_ROOT` → `CARGO_MANIFEST_DIR`（`cargo run` 自动有）→ **可执行文件目录** 依次确定；直接跑 exe 会去 exe 旁边找。设 `BEVY_ASSET_ROOT` 或用 `cargo run`（见 020） |
+| 资产加载失败但程序不报错 | `LoadState::Failed` **不会 panic**，只是永远没有内容。把 `get_load_state(..)` 打出来看（见 020） |
+| 改素材文件后画面不变 | 热重载要 `file_watcher` feature，它在 `dev` 组里、**不在默认 feature**：`features = ["dev"]`（见 020） |
+| UI 里的中文不显示 / 刷 ICU4X 警告 | Bevy 默认字体是 `FiraMono-subset`，**不含中文字形**，必须自带中文字体（见 022） |
+| 正交相机缩放方向搞反 | `scale` 是**视野**的倍数：`scale` 越大看得越广、东西越**小**（见 025） |
+| 播 `.wav` 直接 panic | 默认 `audio` feature 只带 `vorbis`（OGG）。播 WAV 要开 `wav`（依赖 hound），或用 `Pitch` 程序合成（见 024） |
 | 插件之间改了数据却看不到效果 | 跨插件的顺序也要显式声明：`SystemSet` + `configure_sets`（见 016） |
 | `init_state` 处 panic：`StateTransition schedule is missing` | 没装 `StatesPlugin`。`DefaultPlugins` 自带；只用 `LogPlugin` 时要显式补（见 019） |
 | 切换状态后当帧读到的还是旧状态 | `set()` 只是**请求**，切换在**帧末**的 `StateTransition` 里（见 018） |
@@ -547,6 +671,6 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 | 二 · ECS 核心（组件 / 查询 / 过滤 / 命令 / 资源 / 时间 / 输入 / 消息） | 005–012 | ✅ 已完成 |
 | 三 · 事件与关系（观察者 / 层级 / 变更检测） | 013–015 | ✅ 已完成 |
 | 四 · 组织与状态（插件 / 模块 / 状态机） | 016–019 | ✅ 已完成 |
-| 五 · 2D 表现层（资产 / UI / 音频 / 相机 / Gizmos） | 020–026 | ⏳ |
+| 五 · 2D 表现层（资产 / 动画 / UI / 音频 / 相机 / Gizmos） | 020–026 | ✅ 已完成 |
 | 六 · 3D 与渲染（3D / glTF / 拾取 / 着色器） | 027–030 | ⏳ |
 | 七 · 工程质量（综合 / 测试 / 剖析发布） | 031–033 | ⏳ |

@@ -219,43 +219,43 @@
 
 > 从本阶段起需要 `assets/` 目录。资产准备方案见第 4 节。
 
-#### 020 `020_asset.rs` — 资产加载
+#### 020 `020_asset.rs` — 资产加载 ✅ 已实现
 - **目标**：从磁盘加载图片，并正确处理"还没加载完"。
 - **核心 API**：`AssetServer::load`、`Handle<T>`、`Assets<T>::add`、`LoadState`/`AssetServer::is_loaded_with_dependencies`、热重载。
 - **观察点**：`load` 是**异步**的，句柄立刻返回但图可能还没到；不加加载判断会看到一帧空白/默认贴图。
 - **前置**：008。
 
-#### 021 `021_atlas_animation.rs` — 图集与帧动画
+#### 021 `021_atlas_animation.rs` — 图集与帧动画 ✅ 已实现
 - **目标**：用一张雪碧图做逐帧动画。
 - **核心 API**：`TextureAtlasLayout::from_grid(..)`、`Assets<TextureAtlasLayout>`、`TextureAtlas { layout, index }`、`Sprite::from_atlas_image(..)`、用 `Timer` 驱动 `index` 递增。
 - **观察点**：`TextureAtlasLayout` 和 `Sprite` 是分开的——布局可被多个精灵共享，改 `index` 就换帧。这正好复用 010 的 `Timer`。
 - **前置**：010、020。
 
-#### 022 `022_ui.rs` — UI 布局
+#### 022 `022_ui.rs` — UI 布局 ✅ 已实现
 - **目标**：画出 HUD：血条、分数、文字。
 - **核心 API**：`Node`（宽高/padding/margin/flex 布局/`PositionType`）、`Text`/`TextFont`/`TextColor`、`ImageNode`、`BackgroundColor`、`BorderColor`、`ZIndex`、`UiTargetCamera`。
 - **观察点**：UI 用的是 flex 布局，坐标原点在**左上角**——和 003 里精灵的"中心 + y 向上"正好相反，这个反差最容易错。
 - **前置**：003、009。
 
-#### 023 `023_ui_interaction.rs` — UI 交互
+#### 023 `023_ui_interaction.rs` — UI 交互 ✅ 已实现
 - **目标**：按钮能点、能被鼠标悬停。
 - **核心 API**：`Button`、`Interaction`（`None`/`Hovered`/`Pressed`）、`Changed<Interaction>`、UI 上的 `observe`（`Pointer<Click>`/`Pointer<Over>`）、`BackgroundColor` 反馈。
 - **观察点**：两种写法对照——**轮询** `Changed<Interaction>` vs **观察者** `On<Pointer<Click>>`；后者是 0.19 的推荐路径，也更省系统。
 - **前置**：015、018、022。
 
-#### 024 `024_audio.rs` — 音频
+#### 024 `024_audio.rs` — 音频 ✅ 已实现
 - **目标**：背景音乐 + 音效。
 - **核心 API**：`AudioPlayer::new(handle)`、`PlaybackSettings`（`loop`/音量）、`AudioSink`（运行时控制播放/暂停/音量）、`Volume`。
 - **观察点**：音效和 BGM 的区别在于"要不要拿到 `AudioSink` 去控制"——音效放完即弃，BGM 要留句柄。
 - **前置**：012、020。
 
-#### 025 `025_camera.rs` — 相机
+#### 025 `025_camera.rs` — 相机 ✅ 已实现
 - **目标**：跟随、缩放、分屏。
 - **核心 API**：`Camera2d`、`Projection`（`OrthographicProjection` 的 `scale`/`ScalingMode`）、相机作为子实体跟随、`Viewport`/多相机、`Camera::world_to_viewport`。
 - **观察点**：把相机挂成玩家的**子实体** → 零代码跟随（呼应 014）；对比手写"每帧 lerp 到玩家位置"的写法，后者能做平滑跟随。
 - **前置**：014、011。
 
-#### 026 `026_gizmos.rs` — Gizmos 调试绘制
+#### 026 `026_gizmos.rs` — Gizmos 调试绘制 ✅ 已实现
 - **目标**：把不可见的东西画出来（碰撞盒、速度向量、路径）。
 - **核心 API**：`Gizmos`（`line_2d`/`circle_2d`/`rect_2d`/`arrow_2d`）、`GizmoConfigStore`（线宽/开关）、`TransformGizmo`。
 - **观察点**：Gizmos 只画一帧、不留痕，所以必须在 `Update` 里每帧重画；它和 `Sprite` 走的是两套渲染路径，不受精灵层级影响。
@@ -411,6 +411,14 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | 子状态不存在时读不到 | 父状态不满足时子状态**整个不存在**，`Res<State<子状态>>` 会 panic；必须用 `Option<Res<State<..>>>`。`NextState<子状态>` 同理 | 019 |
 | `init_state` 会触发一次 `OnEnter` | 即使"没有发生切换"，初始状态的 `OnEnter` 也会跑一次 —— 初始化的准备可以放心放进去 | 018 |
 | 目录式 example | `examples/<名字>/main.rs` 会被 Cargo 自动识别为名为 `<名字>` 的 example，同级子模块文件**不会**变成独立目标。已在本仓库用 `cargo metadata` 实测确认 | 017 |
+| `assets/` 根怎么找 | 依次是 `BEVY_ASSET_ROOT` → `CARGO_MANIFEST_DIR`（`cargo run` 自动设置）→ **可执行文件所在目录**。所以直接跑 `target/debug/examples/xxx.exe` 会去 exe 旁边找 `assets/`，**全部加载失败**（已实测，报 `Path not found: ...\target\debug\examples\assets\...`）。要么用 `cargo run`，要么先设 `BEVY_ASSET_ROOT` | 020 |
+| 加载失败不会 panic | `LoadState::Failed(..)` 只是永远不 `Loaded`，程序照常跑 —— 典型表现是"东西不出现但什么都不报"。排查第一步永远是打印 `get_load_state(..)` | 020 |
+| `file_watcher` 不在默认 feature | `default = ["2d","3d","ui","audio"]`（只有四个）；热重载在 `dev = ["debug","bevy_dev_tools","file_watcher"]` 里。实测本项目直接改 PNG 等 10 秒也无 `AssetEvent::Modified`。开启还需额外依赖 `notify-debouncer-full` | 020 |
+| 默认字体无中文字形 | 内置字体是 `FiraMono-subset.ttf`（拉丁字母）。UI 里写中文会刷 `ICU4X data error: No segmentation model for complex script: Chinese/Japanese` 且画面上出不来字。必须自带中文字体（`system_font_discovery` + `Font::from_system`，或放进 `assets/fonts/`）。**注意 `println!` 不受影响** —— 终端渲染与 Bevy 渲染是两回事 | 022 |
+| 默认音频只支持 OGG | `audio = ["bevy_audio", "vorbis"]` —— 不含 `wav`。播 `.wav` 会在解码处 **panic**（`bevy_audio/src/audio_source.rs:101`，`unwrap()` on Err）。要 WAV 得开 `wav` feature（引入 `hound`）；全套用 `audio-all-formats`。`Pitch` 程序合成音不需要任何文件与 feature | 024 |
+| 又一批不在 prelude 的类型 | `Viewport` → `bevy::camera::Viewport`；`PlaybackMode` / `Volume` → `bevy::audio::{..}`；`AccumulatedMouseScroll` → `bevy::input::mouse::..`；`GizmoConfigStore` / `DefaultGizmoConfigGroup` → `bevy::gizmos::config::{..}` | 024–026 |
+| `observe(..)` 不是 bundle | 它是 `EntityCommands` 的方法（也导出一个 `EntityCommand`），**不能**写进 `children![..]`。要挂观察者的子实体得先 `spawn` 再 `.observe(..)` | 023 |
+| UI 交互不要用 `Interaction::Pressed` 当"点击" | `Pressed` 在按住期间**持续为真**（与 011 的 `pressed` 同理）。要单次触发，用 `Changed<Interaction>` 过滤，或改用 `On<Pointer<Click>>` 观察者 | 023 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
@@ -427,7 +435,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 | M2 阶段二 | 012 跑完，能写出帧率无关的移动 + 冷却射击 | ✅ 已完成（005–012 全部落地并实跑验证） |
 | M3 阶段三 | 015 跑完，能用观察者替代消息、说清变更检测省下了什么 | ✅ 已完成（013–015 全部落地并实跑验证） |
 | M4 阶段四 | 019 跑完，多文件工程 + 完整状态机可跑 | ✅ 已完成（016–019 全部落地并实跑验证） |
-| M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ⏳ |
+| M5 阶段五 | 026 跑完，2D 表现层齐活（资产/动画/UI/音频/相机/调试） | ✅ 已完成（020–026 全部落地并实跑验证） |
 | M6 阶段六 | 030 跑完，能加载 glTF 并写自定义 WGSL 材质 | ⏳ |
 | M7 阶段七 | 033 跑完，有一个可测试、可剖析、可发布的小游戏 | ⏳ |
 
@@ -497,3 +505,20 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 >   `DespawnOnExit` 的清理效果。
 > - 019 规格里的 `ComputedStates` **未现场演示**（与 `SubStates` 的演示目标重叠，
 >   按规划原则第 8 条留在文末说明）。
+> 阶段五（020–026）的实施备注：
+> - 本阶段第一次需要 `assets/`。按规划采用**全程序化生成**：新增 `tools/make_assets.py`
+>   （用捆绑的 Python + Pillow）生成 `logo.png` 与 6 帧雪碧图 `runner.png`。
+>   音频素材最终**没有生成** —— 原因见下。
+> - 实测纠正了三处会导致"照着写跑不起来"的认知，都已写进例子与 4.5：
+>   ① **`assets/` 的根会回落到可执行文件目录**，直接跑 exe 必然加载失败（本讲开发时踩到）；
+>   ② **`file_watcher` 不在默认 feature**，热重载在本项目根本不生效
+>      （初版误以为它是默认开启的，已更正）；
+>   ③ **默认音频只支持 OGG**，播 WAV 会直接 panic，而 `wav` / `file_watcher`
+>      所需的额外依赖在本机无法下载。
+> - 024 因此**改用 `Pitch` 程序合成音**：不需要音频文件、不需要额外 feature，
+>   反而把"频率"这个参数暴露出来，比文件名更能说明 `AudioPlayer` 在播什么。
+>   文件播放的正确姿势（转 OGG）写在文末。
+> - 022 实测发现 **Bevy 内置字体不含中文字形**：UI 里写中文会刷 ICU4X 警告且显示不出来。
+>   本讲 UI 文本因此统一改成 ASCII，并把"要自带中文字体"写成例子里的重点提示。
+> - 025 是本阶段唯一"没有输入也能看"的一讲：用 `Viewport` 把同一份世界画在左右两半，
+>   左相机可滚轮缩放 —— 一眼看出 `scale` 是"视野倍数"而不是"物体倍数"。
