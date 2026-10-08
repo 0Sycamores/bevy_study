@@ -1,0 +1,121 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "bevy_study/tools/make_assets.py"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "PyramidPair",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Root",
+      "children": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "PyramidA",
+      "mesh": 0,
+      "translation": [
+        -1.2,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "PyramidB",
+      "mesh": 0,
+      "translation": [
+        1.2,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Pyramid",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "PyramidMaterial",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.85,
+          0.35,
+          0.22,
+          1.0
+        ],
+        "metallicFactor": 0.3,
+        "roughnessFactor": 0.5
+      }
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 18,
+      "type": "VEC3",
+      "min": [
+        -0.6,
+        0.0,
+        -0.6
+      ],
+      "max": [
+        0.6,
+        1.0,
+        0.6
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 18,
+      "type": "VEC3"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 216,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 216,
+      "byteLength": 216,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 432,
+      "uri": "data:application/octet-stream;base64,AAAAAAAAgD8AAAAAmpkZPwAAAACamRm/mpkZvwAAAACamRm/AAAAAAAAgD8AAAAAmpkZPwAAAACamRk/mpkZPwAAAACamRm/AAAAAAAAgD8AAAAAmpkZvwAAAACamRk/mpkZPwAAAACamRk/AAAAAAAAgD8AAAAAmpkZvwAAAACamRm/mpkZvwAAAACamRk/mpkZvwAAAACamRm/mpkZPwAAAACamRm/mpkZPwAAAACamRk/mpkZvwAAAACamRm/mpkZPwAAAACamRk/mpkZvwAAAACamRk/AAAAAP61Az+ohFu/AAAAAP61Az+ohFu/AAAAAP61Az+ohFu/qIRbP/61Az8AAAAAqIRbP/61Az8AAAAAqIRbP/61Az8AAAAAAAAAAP61Az+ohFs/AAAAAP61Az+ohFs/AAAAAP61Az+ohFs/qIRbv/61Az8AAAAAqIRbv/61Az8AAAAAqIRbv/61Az8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAA"
+    }
+  ]
+}
