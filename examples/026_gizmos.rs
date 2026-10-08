@@ -27,7 +27,8 @@ fn main() {
             ..default()
         }))
         .add_systems(Startup, (setup, configure_gizmos))
-        .add_systems(Update, (drift, draw_debug))
+        // 先更新位置与方向，再画 —— 否则箭头可能显示的是上一帧的方向
+        .add_systems(Update, (drift, draw_debug).chain())
         .run();
 }
 
@@ -69,16 +70,25 @@ fn configure_gizmos(mut store: ResMut<GizmoConfigStore>) {
 }
 
 /// 让哨兵在世界里漂啊漂（碰到边界就反弹）—— 只是给 Gizmos 提供"会动的东西"。
-fn drift(time: Res<Time>, mut sentries: Query<(&Drift, &mut Transform)>) {
+///
+/// 注意 `Drift` 这里是 `&mut` —— **反弹的本质是改速度方向**，不是改位置。
+/// （早先这里只写了 `clamp` 把位置拉回边界，结果哨兵是"贴住边界不动"，
+///   看起来像卡住了。要真的弹回来，必须把那个轴的速度取反。）
+fn drift(time: Res<Time>, mut sentries: Query<(&mut Drift, &mut Transform)>) {
     const BOUND: f32 = 400.0;
-    for (drift, mut transform) in &mut sentries {
+    for (mut drift, mut transform) in &mut sentries {
         transform.translation += (drift.0 * time.delta_secs()).extend(0.0);
-        // 简单反弹：出界就翻方向
+
+        // 碰到哪个轴就翻转**那个轴**的速度分量，另一个轴保持不变
         if transform.translation.x.abs() > BOUND {
             transform.translation.x = transform.translation.x.clamp(-BOUND, BOUND);
+            drift.0.x = -drift.0.x;
+            println!("   [反弹] 撞到左右边界，水平速度改为 {:.0}", drift.0.x);
         }
         if transform.translation.y.abs() > BOUND {
             transform.translation.y = transform.translation.y.clamp(-BOUND, BOUND);
+            drift.0.y = -drift.0.y;
+            println!("   [反弹] 撞到上下边界，垂直速度改为 {:.0}", drift.0.y);
         }
     }
 }
@@ -123,13 +133,53 @@ fn draw_debug(mut gizmos: Gizmos, sentries: Query<(&Transform, &Sight, &Drift)>)
 // ─────────────────────────────────────────────────────────────────────
 // 跑起来会看到什么
 //
-//   · 三个蓝方块在世界里漂移
+//   · 三个蓝方块在世界里漂移，**碰到边界会反弹**（速度取反后往回走）
 //   · 每个方块外面套一个彩色的圈 —— 那是它的索敌半径（数据本身看不见）
 //   · 每个方块伸出一支黄色箭头 —— 那是它的速度方向与大小
+//     （反弹时箭头会立刻掉头，因为方向数据真的变了）
 //   · 灰白色的外框标出世界边界，中心的十字标出原点
+//
+// 控制台在每次反弹时打印一行（实测 20 秒内 5 次）：
+//
+//   ── 三个哨兵：方块是实体，圈和箭头是 Gizmos 另画的
+//      圈 = 索敌半径，箭头 = 漂移速度，外框 = 世界边界
+//      [反弹] 撞到上下边界，垂直速度改为 -55
+//      [反弹] 撞到上下边界，垂直速度改为 30
+//      [反弹] 撞到左右边界，水平速度改为 70
+//      [反弹] 撞到左右边界，水平速度改为 -60
+//      [反弹] 撞到左右边界，水平速度改为 40
 //
 // 值得注意的是：**方块是"实体"，圈和箭头不是。**
 // 你无法用 `Query` 找到那些圈，也无法 `despawn` 它们。
+//
+// ─────────────────────────────────────────────────────────────────────
+// 顺带一个真实 bug 的教训：`clamp` 不等于反弹
+//
+// 本讲初版的 `drift` 是这么写的：
+//
+//   if transform.translation.x.abs() > BOUND {
+//       transform.translation.x = transform.translation.x.clamp(-BOUND, BOUND);
+//   }                                  // ← 只把位置拉回边界，没改速度
+//
+// 注释写的是"出界就翻方向"，代码却只做了 `clamp`。结果哨兵**贴住边界不动**，
+// 看起来像卡死；而且因为 `Drift` 当时是不可变借用（`&Drift`），
+// 想改也改不了 —— **类型签名其实早就提示了这一点**。
+//
+// 真正的反弹必须改**速度**：
+//
+//   fn drift(.., sentries: Query<(&mut Drift, &mut Transform)>) {   // ← &mut
+//       ...
+//       drift.0.x = -drift.0.x;      // 撞到哪个轴就翻转哪个轴
+//   }
+//
+// 两个可复用的小经验：
+//   · **"位置被限制住了，但东西不动"** 几乎总是"改了位置、没改速度"
+//   · 写物理/运动代码时，先问一句"我改的是位置还是速度"——
+//     反弹、加速、摩擦都是在改**速度**，`clamp` 位置只是兜底
+//
+// 另外这里顺便演示了另一种"看不见的 bug"：**注释和代码说的不是一回事**。
+// 本讲只能靠"跑起来看"才发现 —— 这也正是 026 整讲存在的理由。
+// ─────────────────────────────────────────────────────────────────────
 //
 // ─────────────────────────────────────────────────────────────────────
 // ★ 为什么必须每帧重画
