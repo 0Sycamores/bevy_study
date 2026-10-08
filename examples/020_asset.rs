@@ -91,7 +91,7 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
 
     commands.insert_resource(Logo(handle));
 
-    println!("   左：直接用手柄（内容到位前是空白）");
+    println!("   左：直接使用句柄（内容到位前是空白）");
     println!("   右：占位方块（到位后自动换成真图）");
     println!("   下：不存在的路径（永远不出现，但不会崩）");
 }
@@ -150,7 +150,7 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 // 实测输出
 //
 //   ── assets.load("textures/logo.png") 已返回句柄（内容此刻还没到）
-//      左：直接用手柄（内容到位前是空白）
+//      左：直接使用句柄（内容到位前是空白）
 //      右：占位方块（到位后自动换成真图）
 //      下：不存在的路径（永远不出现，但不会崩）
 //      第 1 帧  LoadState = Some(Loaded)
