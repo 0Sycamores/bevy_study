@@ -118,17 +118,20 @@ fn report(hp: Res<Health>, score: Res<Score>) {
 //   Update schedule built successfully, however: 1 pairs of systems with
 //   conflicting data access have indeterminate execution order. Consider
 //   adding `before`, `after`, or `ambiguous_with` relationships between these:
-//    -- <Enable the debug feature to see the name> (in set Battle) and
-//       <Enable the debug feature to see the name> (in set Battle)
-//       conflict on: ["<Enable the debug feature to see the name>"]
+//    -- check_death (in set Battle) and apply_damage (in set Battle)
+//       conflict on: ["004_schedule::Health"]
 //
 // 这就是"顺序歧义"的真面目：**没有崩溃、没有报错、每个系统单独看都对**，
 // 但玩家吃到了致命伤害，既没死也没加分。
 //
-// Bevy 默认把系统名藏起来了（那几处 `<Enable the debug feature ...>`）。
-// 想让它直接点名是哪两个系统，在 `Cargo.toml` 里给 bevy 打开 debug feature：
+// 注意这条警告**直接点名**了是哪两个系统、冲突在哪个组件上。这靠的是
+// 项目 `Cargo.toml` 里开着的 `dev`（其中含 `debug`）：
 //
-//     bevy = { version = "0.19.1", features = ["debug"] }
+//     bevy = { version = "0.20", features = ["dev"] }
+//
+// 如果没开 `debug`，那几处名字会退化成占位文字
+// `<Enable the debug feature to see the name>`：警告照样发，但不告诉你是谁在冲突，
+// 排查要费劲得多 —— **这是学习期间开 `dev` 最划算的一个理由。**
 //
 // ⚠️ 一个反直觉、但很重要的点：**这个错误顺序是稳定的。**
 // 上面这个例子连着跑 5 次，check_death 每次都排在 apply_damage 前面。
