@@ -1,4 +1,4 @@
-# bevy_study 课程规划（Bevy 0.19.1）
+# bevy_study 课程规划（Bevy 0.20）
 
 > 全栈进阶版：33 讲，7 个阶段，从最小 App 到 3D + 着色器 + 性能剖析 + 发布构建。
 > 本文是**规划**。当前 `examples/` 里仍是旧的 10 个例子，按本规划实施后会被替换（对应关系见文末）。
@@ -346,7 +346,7 @@
 ## 4. 实施注意事项
 
 ### 4.1 资产准备（020 起需要）
-上游 crate 包**不附带** `assets/`（已确认 `bevy-0.19.1/assets` 不存在），需要自建：
+上游 crate 包**不附带** `assets/`（已确认 `bevy-0.20.0/assets` 不存在），需要自建：
 
 | 用途 | 方案 |
 |---|---|
@@ -358,16 +358,16 @@
 > 这样 `assets/` 完全由脚本生成，可复现、可进版本库，不引入外部下载依赖。
 
 ### 4.2 参考源
-本机已有 Bevy 0.19.1 的全部上游示例源码，**写每一讲时应对照它核对 API**，不要凭记忆：
+本机已有 Bevy 0.20.0 的全部上游示例源码，**写每一讲时应对照它核对 API**，不要凭记忆：
 
 ```
-C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19.1\examples\
+C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20.0\examples\
 ```
 
 412 个 `.rs` 文件，按主题分目录（`ecs/`、`state/`、`time/`、`ui/`、`picking/`、`shader/` …）；
-测试示例在 `bevy-0.19.1\tests\how_to_test_apps.rs` 与 `how_to_test_systems.rs`（对应 032）。
+测试示例在 `bevy-0.20.0\tests\how_to_test_apps.rs` 与 `how_to_test_systems.rs`（对应 032）。
 
-### 4.3 已核实的 0.19.1 API 变更（写代码时别用旧名）
+### 4.3 已核实的 API 变更（写代码时别用旧名）
 
 | 旧写法 | 0.19.1 正确写法 | 影响讲次 |
 |---|---|---|
@@ -387,7 +387,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.19
 - 全部实施后重写 `README.md` 的课程表；在实施完成前，README 顶部保留"正在按 `CURRICULUM.md` 重排"的提示，避免编号混淆。
 - 每讲结束后跑 `cargo check --all-targets`，要求零警告再进下一讲。
 
-### 4.5 0.19.1 实测行为（不是改名，是语义）
+### 4.5 实测行为（不是改名，是语义；随版本升级需重新核对）
 
 以下几条都是**实跑验证过的**，写后续讲次时直接采信，不要再凭印象：
 
