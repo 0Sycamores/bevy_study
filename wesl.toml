@@ -1,0 +1,22 @@
+# WESL 清单。编辑器工具（Zed 的 WGSL/WESL 插件 → wgsl-analyzer）靠它建立 WESL
+# 包图；`cargo build` 不读这个文件，构建与运行时都用不到它。
+#
+# 插件只认清单里显式声明的包，而且只支持 path 依赖：`bevy_pbr` 是 bevy 的传递
+# 依赖，库依赖（`package = "..."`）上游还没实现，所以这里直接指向本地 bevy 源码
+# 检出。
+#
+# 不指向 ~/.cargo/registry 里的解包目录：那里是扁平的 `bevy_pbr-0.20.0/`，而
+# bevy_pbr 自带的 WESL 元数据用的是仓库布局的相对路径（`../bevy_render`、
+# `../../constants`），并且 `constants` 没有发布到 crates.io——缺任意一条路径，
+# 整个包就加载失败，`import bevy_pbr::…` 会报 could not find package。
+
+# 配合当前 wgsl-analyzer 的 WESL 版本。
+edition = "2026_pre"
+
+# shader 根目录，也就是 `package::` 指向的位置；默认值是 ./shaders。
+root = "./assets/shaders"
+
+[dependencies]
+# bevy 源码检出，版本与 Cargo.toml 里的 bevy 一致（v0.20.0 标签）。检出目录里
+# 同时有 crates/ 和 constants/，bevy_pbr 声明的依赖路径才能解析。
+bevy_pbr = { path = "../bevy-0.20-src/crates/bevy_pbr" }
