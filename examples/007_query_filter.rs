@@ -197,7 +197,7 @@ fn list_props(props: Query<&Label, (Without<Player>, Without<Enemy>)>) {
 //
 // 把 `mirror_enemies` 里的 `Without<Player>` 去掉，代码**照样编译通过**
 // （`cargo check` 不会有任何意见），但一运行就 panic。
-// 下面是 0.20 实测原文（临时去掉那半句，跑完立刻还原；退出码 101）：
+// 下面是实测原文（临时去掉那半句，跑完立刻还原；退出码 101）：
 //
 //   thread 'main' (...) panicked at
 //   .../bevy_ecs-0.20.0/src/query/state.rs:216:13:
@@ -210,8 +210,9 @@ fn list_props(props: Query<&Label, (Without<Player>, Without<Enemy>)>) {
 // 注意两点：
 //   · `Query<...>` 里印的是**真实的查询类型**，`in system` 后面是
 //     **真实的系统路径** `007_query_filter::mirror_enemies`。
-//     `dev` 特性打开了 `debug`，所以不再有 `<Enable the debug feature to see the name>`
-//     这类占位文字（这点和 004 讲的调度警告是同一个机制）。
+//     `dev` 特性打开了 `debug`，所以不会退化成
+//     `<Enable the debug feature to see the name>` 这类占位文字
+//     （这点和 004 讲的调度警告是同一个机制）。
 //   · 这次 panic 在 `main` 线程上，且发生在系统**初始化**阶段 ——
 //     所以什么都还没来得及打印就结束了。
 //

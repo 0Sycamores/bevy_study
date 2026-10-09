@@ -59,11 +59,11 @@ fn main() {
 //
 // 同样的功能、同样的输出，但 `main.rs` 从"两百行实现"变成了"三十行声明"。
 //
-// 补充两点（都是 0.20 实跑）：
+// 补充两点（都实测过）：
 //   · 这份输出与 016 **逐字相同**，且各自连跑 6 次都稳定。
 //   · 017 比 016 少了一个 `PluginGroup`：016 用 `GamePlugins` 把两个插件再打包成一组，
 //     017 直接写 `(score::ScorePlugin, enemy::EnemyPlugin)` 元组。
-//     两者都能被 `add_plugins(..)` 收下 —— 0.20 里 `add_plugins` 要的是
+//     两者都能被 `add_plugins(..)` 收下 —— `add_plugins` 要的是
 //     `impl Plugins<M>`，而**元组和插件组都实现了它**（`bevy_app/src/plugin.rs` 里
 //     的 `impl_plugins_tuples!` 给元组统一实现），所以元组写法少一层包装、效果等价。
 //

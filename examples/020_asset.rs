@@ -206,7 +206,7 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 // ⚠️ 第 3 条是最容易踩的：直接双击 / 直接跑 `target/debug/examples/020_asset.exe`
 //    时，引擎会去 `target/debug/examples/assets/` 找 —— 当然找不到，
 //    于是所有资产都是 `Failed`，画面全空。
-//    本讲开发过程中就踩了这一次，报错是：
+//    踩到这条时的报错是：
 //
 //      Path not found: ...\target\debug\examples\assets\textures/logo.png
 //
@@ -248,8 +248,7 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 //     （否则只能看到 `<Enable the debug feature to see the name>`，004 讲过）
 //   · `bevy_dev_tools`    —— 状态切换日志、世界检查等调试工具
 //   · `render_dev_tools`  —— 也就是 `bevy_dev_tools/render`：FPS 悬浮窗、渲染调试
-//     面板、连拍截图、无限网格 —— 这一组在 0.20 才从 `bevy_dev_tools` 里拆出来，
-//     所以 0.19 的 `dev` 里没有它
+//     面板、连拍截图、无限网格
 //
 // 代价是编译更久、二进制更大。**学习期间开 `dev` 相当划算**，
 // 因为几乎所有报错信息都会清楚得多。

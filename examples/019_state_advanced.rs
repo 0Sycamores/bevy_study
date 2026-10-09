@@ -176,8 +176,8 @@ fn report(
 // （道具名按名字排序后是 丙/乙/甲 —— 中文按 Unicode 码点比较，跟出场顺序无关，
 //   这里只是为了让输出稳定，不影响结论。）
 //
-// ⚠️ 这份逐帧时序是 **0.20 重新实跑**过的：同一份产物连跑 11 次，六帧输出逐字相同。
-//    0.20 把若干内置调度改成了弱序，但本讲的顺序不靠"默认调度恰好这么排"：
+// ⚠️ 这份逐帧时序是实测过的：同一份产物连跑 11 次，六帧输出逐字相同。
+//    内置调度是弱序的，但本讲的顺序不靠"默认调度恰好这么排"：
 //    · `drive_transitions → advance_progress → report` 三者显式 `.chain()`；
 //    · 状态切换固定在帧末的 `StateTransition` 调度里（018 讲的）；
 //    · 道具的生成与销毁各由 `OnEnter` / `DespawnOnExit` 驱动。
@@ -233,7 +233,7 @@ fn report(
 //   `DespawnWhen::new(|transition| ..)`   自定义判断，最灵活
 //
 // 一个细节：**重复挂也不会出错**。如果实体已经被销毁，引擎不会报错
-// （0.20 的实现里用的是 `commands.entity(e).try_despawn()`，源码注释也写明
+// （引擎的实现里用的是 `commands.entity(e).try_despawn()`，源码注释也写明
 //   "If the entity has already been despawned no warning will be emitted"），
 // 所以层级深处多挂几个 `DespawnOnExit` 是安全的。
 //

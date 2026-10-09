@@ -45,7 +45,7 @@ fn tick(mut frame: Local<u32>) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// 实测输出（0.20 实跑，`cargo run --example 001_app`）
+// 实测输出（`cargo run --example 001_app`）
 //
 //   [Startup] 整个 App 只跑这一次
 //   [Update] 第 1 帧

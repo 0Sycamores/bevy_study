@@ -344,11 +344,11 @@ fn report_clocks(
 //
 // 每个阶段都会 `update` 两次，所以每个标题下面是两行。
 //
-// ⚠️ **3 倍速那一格不是 300ms，而是 250ms 封顶** —— 这不是笔误，是 0.20 的一处真实行为变化。
+// ⚠️ **3 倍速那一格不是 300ms，而是 250ms 封顶** —— 这不是笔误。
 //    `Time<Virtual>` 有一个 `max_delta`（默认 `DEFAULT_MAX_DELTA = 250ms`），
-//    用来防止长时间卡顿后一帧推进太多。两个版本的裁剪时机不同：
+//    用来防止长时间卡顿后一帧推进太多。倍速的放大结果同样受它限制：
 //
-//        // 0.20：先乘倍速，再裁剪（bevy_time-0.20.0/src/virt.rs:249，略去 tracing）
+//        // bevy_time-0.20.0/src/virt.rs:249，略去 tracing
 //        let scaled = raw_delta.mul_f64(speed);
 //        let (effective_speed, delta) = if scaled > max_delta {
 //            (max_delta.as_secs_f64() / raw_delta.as_secs_f64(), max_delta)
@@ -356,12 +356,7 @@ fn report_clocks(
 //            (speed, scaled)
 //        };
 //
-//        // 0.19：先裁剪，再乘倍速（所以 100ms × 3 = 300ms 能突破 250ms）
-//        // bevy_time-0.19.1/src/virt.rs:240，同样略去 tracing
-//        let clamped_delta = if raw_delta > max_delta { max_delta } else { raw_delta };
-//        let delta = clamped_delta.mul_f64(effective_speed);
-//
-//    结果就是：0.20 里**倍速放大后的结果同样受 `max_delta` 限制**，
+//    也就是说：**倍速放大后的结果同样受 `max_delta` 限制**，
 //    真实帧长约 100ms 时设 `set_relative_speed(3.0)`，实际只推进约 250ms（≈2.5 倍）。
 //    注意 `effective_speed` 这时会被改写成 `max_delta / raw_delta`
 //    （按实测的 raw ≈ 100.7ms 算约 2.48），而 `relative_speed()` 依然报 3.0 ——
@@ -401,7 +396,7 @@ fn report_clocks(
 //                                           设置 / 读取名义倍速（上面打印的 speed=3 就是这个）
 //   effective_speed()                       本帧实际生效的倍速；
 //                                           被 `max_delta` 截断时它与 relative_speed 不同
-//   max_delta() / set_max_delta(Duration)   单帧推进上限，**默认 250ms**（0.20 里倍速结果也受它限制）
+//   max_delta() / set_max_delta(Duration)   单帧推进上限，**默认 250ms**（倍速放大的结果也受它限制）
 //   from_max_delta(Duration)                带自定义上限构造一个 Time<Virtual>
 //
 // 注意 `Time::<Fixed>::from_hz(60.0)` 这类"构造器"是关联函数，

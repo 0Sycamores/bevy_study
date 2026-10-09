@@ -15,7 +15,7 @@
 //! 注意：轮询适合"要看持续状态"，观察者适合"发生才算数"，本讲两个按钮并排对照
 
 use bevy::{
-    // 这几个都不在 prelude 里（prelude 里的 `Button` / `Interaction` 是 0.20 要淘汰的旧 API）。
+    // 这几个都不在 prelude 里（prelude 里的 `Button` / `Interaction` 已废弃，见文末）。
     picking::hover::Hovered,
     prelude::*,
     ui::Pressed,
@@ -86,8 +86,8 @@ fn setup(mut commands: Commands) {
     };
 
     // 两个按钮都用同一套东西：
-    //   Button            0.20 的"无外观"按钮控件，行为（按下/点击）由 ButtonPlugin 管
-    //   Hovered           悬停状态 —— 0.20 要自己挂，拾取后端会更新它
+    //   Button            "无外观"的按钮控件，行为（按下/点击）由 ButtonPlugin 管
+    //   Hovered           悬停状态 —— 要自己挂上，拾取后端会更新它
     //   Pickable::IGNORE  挂在下面的文字上，让文字不参与拾取，事件才会落在按钮本体上
     //
     // ── 按钮 A：靠轮询 `Hovered` + `Pressed` 驱动 ──
@@ -156,7 +156,7 @@ fn setup(mut commands: Commands) {
 
 /// 写法①：**轮询**。每帧查一遍"按钮现在是什么状态"，一个系统管完外观三态 + 计数。
 ///
-/// 0.20 里没有"三种状态的枚举"了：悬停看 `Hovered`（一个 `bool`），
+/// 没有"三种状态的枚举"：悬停看 `Hovered`（一个 `bool`），
 /// 按住看 `Pressed` 这个**标记组件在不在** —— 三态是这两个组件凑出来的。
 /// 好在它们都由引擎驱动，我们只要读，不用自己维护。
 fn poll_button(
@@ -201,7 +201,7 @@ fn on_press(press: On<PointerPress>, mut colors: Query<&mut BackgroundColor>) {
     if let Ok(mut color) = colors.get_mut(press.entity) {
         *color = PRESSED.into();
     }
-    // `Pointer` 在 0.20 不再是泛型，而是挂在事件上的字段；位置是 `Vec2`
+    // `Pointer` 不是泛型参数，而是挂在事件上的字段；位置是 `Vec2`
     println!("   [观察者] 按下 @ {:?}", press.pointer.position);
 }
 
@@ -278,7 +278,7 @@ fn refresh_text(counters: Res<Counters>, mut texts: Query<&mut Text, With<Status
 // 指针事件家族
 //
 // **UI 与精灵的指针拾取默认开启**（3D 网格拾取要手动加 `MeshPickingPlugin`，029 会讲）。
-// 0.20 把它们都"扁平化"了 —— 没有 `Pointer<Over>` 这种泛型写法，事件本身就是类型：
+// 这些事件都是"扁平"的 —— 没有 `Pointer<Over>` 这种泛型写法，事件本身就是类型：
 //
 //   `PointerOver` / `PointerOut`                  移入 / 移出
 //   `PointerPress` / `PointerRelease`             按下 / 松开
@@ -296,15 +296,15 @@ fn refresh_text(counters: Res<Counters>, mut texts: Query<&mut Text, With<Status
 // ─────────────────────────────────────────────────────────────────────
 // 关于 `Button` 组件
 //
-// 0.20 的 `ui_widgets::Button` 是**无外观的 headless 控件**：只给行为，长相全靠自己拼。
+// `ui_widgets::Button` 是**无外观的 headless 控件**：只给行为，长相全靠自己拼。
 // 配套的 `ButtonPlugin`（`DefaultPlugins` 里已带）替我们维护：
 //   · `PointerPress` → 给实体插入 `Pressed`；`PointerRelease` → 摘掉它
 //   · 松开且仍指着自己 → 发出 `Activate`（键盘回车/空格，在聚焦时也发）
 //   · 还要求一个 `AccessibilityNode`，无障碍工具能认出这是按钮
 //
-// 另一处变化：悬停状态要自己挂 `Hovered` 组件（`Hovered::default()`），
+// 悬停状态要自己挂 `Hovered` 组件（`Hovered::default()`），
 // 拾取后端在指针进出时把它改成 `true`/`false` —— 这就是"能用变更检测轮询"的那份状态。
 //
-// 旧的 `bevy_ui::Interaction`（枚举）在 0.20 已标 `deprecated`，prelude 里还留着但别再用：
-// 三态换成了标记组件（`Pressed`）加悬停组件（`Hovered`），本讲就是这么写的。
+// `bevy_ui::Interaction`（那个三态枚举）已标 `deprecated`，prelude 里还留着但别再用：
+// 它那三态由标记组件（`Pressed`）加悬停组件（`Hovered`）表达 —— 本讲就是这么写的。
 // ─────────────────────────────────────────────────────────────────────

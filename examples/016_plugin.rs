@@ -168,7 +168,7 @@ impl PluginGroup for GamePlugins {
 //      [敌人插件] 小兵乙 抵达终点，+10 分
 //      [分数插件] Score = 20
 //
-// （0.20 实跑，同一份产物连跑 6 次逐字相同。跨插件的组间顺序由
+// （实跑，同一份产物连跑 6 次逐字相同。跨插件的组间顺序由
 //   `configure_sets` 显式声明，所以这里没有留给调度器自由发挥的余地。）
 //
 // 两处值得说明：
@@ -177,12 +177,12 @@ impl PluginGroup for GamePlugins {
 //    因为**资源刚被创建的那一帧也算"变过"**（`Added` 是 `Changed` 的子集，015 讲的）。
 //
 // 2. `Score = 20` 出现在**同一帧**的敌人结算之后，这不是自动的。
-//    初版没写 `.in_set` / `configure_sets` 时，`report_score` 与 `check_arrival`
+//    不给系统分组、不写 `configure_sets` 时，`report_score` 与 `check_arrival`
 //    顺序未定，结果那一帧分数加了却**永远没被打印出来**（只有 3 帧，错过了就没了）。
 //    这正是 004 讲的顺序问题，只不过跨了插件边界 —— 修法是给系统分组、
 //    在**一个地方**声明组间顺序。
 //
-//    这条 0.20 复测过（临时把 `.in_set(..)` 和 `configure_sets(..)` 都去掉，
+//    实测（临时把 `.in_set(..)` 和 `configure_sets(..)` 都去掉，
 //    把 `report_score` 放在 `(report_score, move_enemies, check_arrival)` 的最前面）：
 //    `[分数插件] Score = 20` **一次都没出现**，第 3 帧只打印了两行 `[敌人插件]`。
 //    原因是那一帧 `report_score` 先跑（分数还是 0，且它是"刚创建"才算变更，
@@ -201,11 +201,11 @@ impl PluginGroup for GamePlugins {
 //   app.init_state::<S>()                              注册状态（018 讲）
 //   app.add_plugins(别的插件)                          插件还能装插件
 //
-// ⚠️ 0.20 里**没有 `app.add_event::<T>()`**。事件分成两类之后（012/013 讲）：
+// ⚠️ **没有 `app.add_event::<T>()` 这个方法**。事件分成两类（012/013 讲）：
 //   · 要"缓冲两帧、谁都能读"的消息 → `add_message::<T>()` 注册
 //   · 走观察者的 `Event` / `EntityEvent` → 不用单独注册，
 //     `add_observer(..)` / `commands.trigger(..)` 自己会把它登记进 World
-// 照着老教程写 `add_event` 会直接编译不过（没有这个方法）。
+// 写 `add_event` 会直接编译不过 —— 根本没有这个方法。
 //
 // 所以插件不是一个新概念，它只是**把一段配置搬了个家** ——
 // 从"堆在 main 里"变成"归属于某个功能模块"。

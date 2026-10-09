@@ -134,7 +134,7 @@ fn count_final(enemies: Query<&Enemy>) {
 //   ⑤ despawn_weakest      排队销毁 7v0
 //   ⑥ count_final          → 还剩 2 个敌人
 //
-// （0.20 实跑，同一份产物连跑 6 次输出逐字相同 —— 包括 `7v0` 这个实体编号。）
+// （实跑，同一份产物连跑 6 次输出逐字相同 —— 包括 `7v0` 这个实体编号。）
 //
 // ① 里的 "0 → 0" 是本讲的核心：命令是延迟的，同一系统内排队后立刻查也查不到。
 //
@@ -154,7 +154,7 @@ fn count_final(enemies: Query<&Enemy>) {
 // 第 2 条由 `ScheduleBuildSettings::auto_insert_apply_deferred` 控制，
 // **默认就是 `true`**。所以上面 `.chain()` 之后，每一步都能看到上一步的结果。
 //
-// 实测对比（0.20）：把这两个系统单独拎出来、去掉 `.chain()`，写成
+// 实测对比：把这两个系统单独拎出来、去掉 `.chain()`，写成
 // `(spawn_enemies, count_enemies)`，跑 3 帧 × 10 次 —— `② count_enemies`
 // **每次都打印 0 个**，命令要等整个 `Update` 跑完才落地。
 //

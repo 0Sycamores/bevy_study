@@ -1,22 +1,15 @@
-// 030 讲的自定义材质（Bevy 0.20 / WESL）。
+// 030 讲的自定义材质。
 //
-// 0.20 起 Bevy 用 **WESL** 取代了自研的 "Bevy Extended WGSL" 方言：
-//   · 文件扩展名 .wgsl → .wesl
-//   · `#import a::b`      →  `import a::b;`（结尾分号，且必须放在文件最前面）
-//   · `#ifdef X`          →  `@if(X)`
-//   · `#{NAME}`           →  `constants::NAME`
-//   · `#define_import_path` 没有了；模块名改为「crate + 文件路径」
-//
-// ⚠️ 纯 WGSL（不含任何预处理器指令）仍可直接用 —— 本文件曾经是那种半方言写法，
-//    升级到 0.20 后**运行时**直接报：
-//      Shader '' parsing error: ... found "#"
-//    所以必须改写。注解见文末的迁移说明。
+// Bevy 的 shader 用 WESL 编写 —— 它是 WGSL 的扩展，提供了模块、导入、
+// 条件编译这些能力。写自定义材质时，你只需要关心三件事：
+//   ① 把引擎的顶点着色器输出类型 import 进来，作为片元着色器的输入
+//   ② 用 `@group` / `@binding` 声明自己的数据
+//   ③ 写 `@fragment` 入口
 
 // ── 顶点着色器的输出，也就是片元着色器的输入 ──
 //
-// 注意模块路径变了：旧的是 `bevy_pbr::forward_io`，
-// 0.20 按「crate + 文件在 crate 里的路径」命名，所以是 `bevy_pbr::render::forward_io`
-// （对应 `bevy_pbr/src/render/forward_io.wesl`）。
+// 模块名按「crate + 文件在该 crate 里的路径」来写，
+// 对应的源文件是 `bevy_pbr/src/render/forward_io.wesl`。
 import bevy_pbr::render::forward_io::VertexOutput;
 
 // ── 传给 shader 的数据 ──
@@ -26,13 +19,11 @@ import bevy_pbr::render::forward_io::VertexOutput;
 //
 // ⚠️ group 不能写死数字，要用常量。
 //
-// 注意是 **group** 用常量、**binding** 用数字 —— 官方迁移指南里那句
-// `@group(2) @binding(constants::MATERIAL_BIND_GROUP)` 是写反了的；
-// 引擎自己的 `bevy_pbr/src/render/pbr_bindings.wesl` 写的是：
+// 材质 bind group 的编号由引擎按启用的特性动态决定，所以必须让它来填。
+// 注意是 **group** 用常量、**binding** 用数字 —— 引擎自己的
+// `bevy_pbr/src/render/pbr_bindings.wesl` 就是这么写的：
 //
 //     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: StandardMaterial;
-//
-// 材质 bind group 的编号由引擎按启用的特性动态决定，所以必须让它来填。
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> base_color: vec4<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(1) var<uniform> params: vec4<f32>;
 

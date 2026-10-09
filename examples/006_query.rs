@@ -87,7 +87,7 @@ fn list_all(scores: Query<(&Label, &Score)>) {
 
 /// 写法③：`single()` —— 只想要**恰好一个**匹配实体时用它。
 ///
-/// 0.19 起它返回 `Result`（0.20 同样如此），所以成功和失败两种情况都得处理掉。
+/// `single()` 返回 `Result`，所以成功和失败两种情况都得处理掉。
 /// 对比下面写法④的 `Single` 参数：那个在失败时直接跳过整个系统。
 fn single_via_query(enemies: Query<(&Label, &Score), With<Enemy>>) {
     match enemies.single() {
@@ -163,7 +163,7 @@ fn populated_param(players: Populated<(&Label, &Score), With<Player>>) {
 // 在内存里连续排列，遍历时缓存友好。顺序不可依赖是它付出的代价。
 //
 // ─────────────────────────────────────────────────────────────────────
-// 取不到数据时，Bevy 的三种反应（0.20 实测）
+// 取不到数据时，Bevy 的三种反应
 //
 //   1. `Query` 命中 0 个 → 完全正常。
 //      `for` 不执行、`iter().count()` 得 0，系统照常运行。
@@ -174,7 +174,7 @@ fn populated_param(players: Populated<(&Label, &Score), With<Player>>) {
 //      这是"我的系统怎么没跑"最常见的原因。
 //
 //   3. 缺 `Res<T>` / `ResMut<T>`（资源压根没注册）
-//      → **直接 panic**，不是跳过！0.20 实测报错原文（临时往这个 example 里加了一个
+//      → **直接 panic**，不是跳过！实测报错原文（临时往这个 example 里加了一个
 //        带 `Res<NeverRegistered>` 参数的系统，跑完即删；进程退出码 101）：
 //
 //          thread 'TaskPool (8)' (...) panicked at
@@ -185,15 +185,15 @@ fn populated_param(players: Populated<(&Label, &Score), With<Player>>) {
 //          handle `None` when it happens, or wrap the parameter in `If<T>` to
 //          skip the system when it happens.
 //
-//      和 0.19 时代相比有三点不同，都值得记：
+//      三点值得记：
 //        · **系统名和参数名都是真的**（`006_query::need_missing`、
-//          `Res<NeverRegistered>`）—— `dev` 特性打开了 `debug`，占位文字没有了。
+//          `Res<NeverRegistered>`）—— `dev` 特性打开了 `debug`，不会退化成占位文字。
 //        · panic 打在 **TaskPool 工作线程**上，不是 `main`；而且同一个 Schedule 里
 //          **其它系统会继续跑完**（实测终端上能看到它们的输出与这条 panic 交错），
 //          进程最后以退出码 101 结束。所以"炸掉"指的是这一帧整体失败，不是立刻死。
 //        · 报错源头是 `bevy_ecs` 的 `FallbackErrorHandler`
-//          （`error/handler.rs` 里的 `match_severity`）。0.20 把"系统出错"统一收拢到
-//          这个兜底处理器，但它**默认仍然重新 panic** —— 行为没有变软。
+//          （`error/handler.rs` 里的 `match_severity`）—— 系统出错统一收拢到
+//          这个兜底处理器，但它**默认仍然重新 panic**，不会把错误吞掉。
 //
 //      报错信息自己给了两条出路：要 `Option<Res<T>>` 自己处理 `None`，
 //      或者用 `If<Res<T>>` 让系统在资源缺失时自动跳过。

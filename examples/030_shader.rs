@@ -186,8 +186,7 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 // ─────────────────────────────────────────────────────────────────────
 // ★ 材质 bind group 的编号**不能写死**（本讲最大的坑）
 //
-// 这是本轮踩得最狠的一处。初版照老写法写了 `@group(2)`，编译一切正常，
-// **一跑就炸**：
+// 写成 `@group(2)` 这样的字面量，编译一切正常，**一跑就炸**：
 //
 //     ERROR bevy_render::error_handler: Caught rendering error: Validation Error
 //       Shader global ResourceBinding { group: 2, binding: 0 } is not available
@@ -198,8 +197,8 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 // 报错的意思是"group 2 的 binding 0 在管线里是 storage buffer，不是 uniform"——
 // 也就是**撞到别的组上了**。
 //
-// 原因是 0.19 起材质 bind group 的**编号不是固定的**（0.20 同）：引擎会
-// 根据启用的特性（bindless 之类）动态决定，再通过预处理器变量注入。看引擎自己的
+// 原因是材质 bind group 的**编号不是固定的**：引擎会根据启用的特性
+// （bindless 之类）动态决定，再通过预处理器变量注入。看引擎自己的
 // `pbr_bindings.wesl` 就能发现它一个数字都没写死：
 //
 //     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: StandardMaterial;
@@ -209,7 +208,7 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 //     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> base_color: vec4<f32>;
 //
 // 记住这条：**shader 里凡是和管线布局有关的编号，优先找引擎的常量**，
-// 别照抄示例里的字面量 —— 那些数字在版本之间会变。
+// 别照抄示例里的字面量。
 //
 // ─────────────────────────────────────────────────────────────────────
 // group 的分工（概念上的划分）
