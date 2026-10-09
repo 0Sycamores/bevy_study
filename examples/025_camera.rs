@@ -64,6 +64,11 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Camera2d,
         ZoomableCamera,
+        // ★ 这一行不是可有可无的：场景里有**两台**相机时，UI 默认归 order
+        //   最大的那台（也就是右边那台）管，于是左上角那行文字会跑到**右半边**
+        //   的左上角去。`IsDefaultUiCamera` 明确指定"UI 归我"，它才会出现在
+        //   窗口真正的左上角（细节见文末「Viewport 分屏的要点」）。
+        IsDefaultUiCamera,
         Camera {
             // 左半边
             viewport: Some(Viewport {
@@ -103,6 +108,8 @@ fn setup(mut commands: Commands) {
     ));
 
     // 左上角显示 zoom 数值（UI 文本用英文，原因见 022 讲的中文字体说明）
+    // 注意它显示的是**左相机**的 scale，所以上面给左相机加了 `IsDefaultUiCamera`，
+    // 让这行 UI 跟着左半边的 viewport 排版。
     commands.spawn((
         ZoomText,
         Text::new("left camera scale: 1.00"),
@@ -198,8 +205,11 @@ fn show_camera_state(
 //   · **每台相机都要有 `Camera2d`（或 `Camera3d`）**，`Camera` 组件只是配置。
 //     只写 `Camera { viewport: .. }` 而没有 `Camera2d` 是不行的。
 //   · 多相机同屏时用 `Camera.order` 决定谁画在上面（值大的后画）。
-//   · UI 默认渲染到**主相机**上。多相机时若想把 UI 指定到某台相机，
-//     用 `UiTargetCamera` 目标组件（022 提过）。
+//   · UI 默认渲染到**默认 UI 相机**上，而"默认"的判定是：**有
+//     `IsDefaultUiCamera` 标记就用它，否则用 order 最大的那台**（不是"第一台"）。
+//     本讲两台相机的 order 是 0 和 1，所以不加标记的话，左上角那行文字会跟着
+//     **右半边**的 viewport 排版 —— 这就是本讲给左相机加标记的原因。
+//   · 想只给**某一个** UI 根节点换相机，用 `UiTargetCamera` 目标组件（022 提过）。
 //
 // ─────────────────────────────────────────────────────────────────────
 // 相机跟随的两种做法

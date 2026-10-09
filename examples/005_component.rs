@@ -67,7 +67,12 @@ fn setup(mut commands: Commands) {
         Enemy,
         Health(100.0),
         Sprite::from_color(Color::srgb(0.91, 0.30, 0.31), Vec2::splat(90.0)),
-        Transform::from_xyz(300.0, 40.0, 1.0),
+        // z 给 2.0，比两个 Player 高一层。为什么不能和图省事都写 1.0？
+        // 因为绿方块向右跑过 x ≈ 300 时，会和红方块在 y 方向上擦到一点点
+        // （绿占 y ∈ [-65, 5]，红占 y ∈ [-5, 85]），而**同一 z 下谁盖谁没有保证**
+        // —— 0.20 的 sprite 换成了 `Mesh2d` 后端，官方迁移指南明确提醒"同层
+        // 绘制顺序可能变化"。凡是会重叠的精灵，就显式分开 z。
+        Transform::from_xyz(300.0, 40.0, 2.0),
     ));
 
     // 注意这里从来没写过 `Visibility`。它和 `Transform` 都是 `Sprite` 的
@@ -135,6 +140,10 @@ fn damage_enemy(mut enemies: Query<(&mut Health, &mut Sprite)>) {
 // 3. 查询命中 0 个实体完全正常：`for` 直接不执行，`iter().count()` 得 0，
 //    系统照常运行、不会报错，也**不会**被跳过。
 //    （对比 006 要讲的 `Single`：它要求"恰好一个"，不满足会跳过整个系统。）
+// 4. **会重叠的精灵要给不同的 z。** 0.20 把 sprite 的渲染后端换成了
+//    `Mesh2d` + `SpriteMaterial`，官方迁移指南提醒"同一 Z 层级下的绘制顺序
+//    可能和 0.19 不同"。本讲那个红方块因此从 z = 1.0 提到了 z = 2.0 ——
+//    凡是可能重叠的精灵，都别让它们同层。
 //
 // ── 这两个系统会并行跑 ──
 //

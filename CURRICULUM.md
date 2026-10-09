@@ -84,7 +84,7 @@
 - **⚠️ 实现时发现的重要事实（已写进例子注释）**：错误顺序**在同一构建里是稳定复现的**（连跑 5 次结果一致），
   不是"偶发"。所以教学重点从"偶发错乱"修正为"**无保证**"：
   加一个系统/调一次注册就可能翻过来，判断标准是"有没有声明顺序"，而不是"现在跑着对不对"。
-- **另一发现**：Bevy 默认隐藏系统名（警告里显示 `<Enable the debug feature to see the name>`），
+- **另一发现**：Bevy 默认隐藏系统名（警告里显示 `<Enable the debug feature to see the name>`；本项目开了 `dev`，所以实际会**直接显示系统名**），
   需要 `bevy = { features = ["debug"] }` 才能看到具体是哪两个系统。此 feature **默认未开启**，已在例子与 README 中说明。
 - **前置**：002、003。
 
@@ -398,7 +398,7 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 | `Query` 遍历顺序 | **不是生成顺序**。Bevy 按原型(archetype)分组存储，遍历**逐组**进行，组间先后与生成时间无关，不可依赖 | 006 |
 | `Commands` 何时落地 | `ScheduleBuildSettings::auto_insert_apply_deferred` **默认为 `true`**：`.chain()` / `.after()` 会在"有延迟参数的系统 → 读相关数据的系统"这条边上自动插 `ApplyDeferred`。不声明顺序则落地时机不定（实测同帧内可查到 0 个）。`chain_ignore_deferred()` 只排序、不插同步点 | 008 |
 | `Has<T>` 的位置 | 它是**取数项**（写在元组里、返回 `bool`），**不是**过滤器；`With` / `Without` / `Or` 才是过滤器（写在第二个参数位置） | 007 |
-| `Time` / `Time<Real>` / `Time<Virtual>` | 系统里 `Res<Time>` 拿到的就是**虚拟时钟**。实测（每帧真实流逝 ~100ms）：正常 Time=Real=Virtual≈100ms；`pause()` 后 Time=Virtual=**0** 而 Real 仍 ≈100ms；`set_relative_speed(3.0)` 后 Time=Virtual≈**300ms**、Real≈100ms。暂停/慢动作只需改 `Time<Virtual>` | 010 |
+| `Time` / `Time<Real>` / `Time<Virtual>` | 系统里 `Res<Time>` 拿到的就是**虚拟时钟**。实测（每帧真实流逝 ~100ms）：正常 Time=Real=Virtual≈100ms；`pause()` 后 Time=Virtual=**0** 而 Real 仍 ≈100ms；`set_relative_speed(3.0)` 后 Time=Virtual≈**300ms**、Real≈100ms（**0.20 实测已变为 250ms 封顶，见下方 0.20 补充行**）。暂停/慢动作只需改 `Time<Virtual>` | 010 |
 | 手动推进时间 | 不装 `TimePlugin` 时 `init_resource::<Time>()` + `Time::advance_by(dur)` 可精确控制（delta 即所给值）；**装了 `TimePlugin` 则手动 `advance_by(Time<Real>)` 会被插件覆盖**（实测无效） | 010 / 012 |
 | 无窗口多帧推进 | 直接 `app.update()` 循环即可，**不需要** `run()`，也不会因"插件还在构建"而 panic（实测） | 010 / 012 |
 | 消息的生命周期 | **双缓冲，只活两帧**：写在第 N 帧 → 第 N、N+1 帧可读 → 第 N+2 帧消失。实测一条只写一次的消息：读者排在前时第 1 帧读 0、第 2 帧读 1、第 3 帧读 0 | 012 |
@@ -426,6 +426,13 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 | 光源开阴影的字段名 | `shadow_maps_enabled`（旧版叫 `shadows_enabled`） | 027 |
 | 自定义 shader 运行时校验失败 | `@group` 编号**不能写死**。0.19 里材质 bind group 由引擎按特性动态决定并注入，须写 `@group(#{MATERIAL_BIND_GROUP})`。写死 `2` 会撞到 storage buffer，报 `ResourceBinding { group: 2, binding: 0 } is not available in the pipeline layout` 并 `Quitting the application due to Validation RenderError` | 030 |
 | 自定义材质什么都不显示也不报错 | 忘了 `MaterialPlugin::<M>::default()` | 030 |
+> 以下三条是**升级到 0.20 后重新实测**得到的，与 0.19 时的结论不同：
+
+| 0.20 实测行为 | 说明 | 影响讲次 |
+| --- | --- | --- |
+| `Time<Virtual>` 的倍速与上限顺序变了 | 0.19 是「先把真实帧长裁剪到 `max_delta`，再乘倍速」；**0.20 反过来**：先乘倍速、再裁剪到 `DEFAULT_MAX_DELTA = 250ms`（`bevy_time-0.20.0/src/virt.rs:249`）。所以真实帧长 100ms + `set_relative_speed(3.0)` 现在只得到 **250.0ms 封顶（≈2.5 倍）**，不再是 ~300ms。想要真正的 3 倍得自己调大 `set_max_delta` | 010 |
+| 缺资源的 panic **形态变了** | 仍会 panic（`FallbackErrorHandler` 默认 `match_severity` 即重新 panic），但：① panic 打在 **TaskPool 工作线程**上而不再是 `main`；② **同一 Schedule 里其余系统仍会跑完**，最后才以退出码 101 结束；③ 源头是 `bevy_ecs-0.20.0/src/error/handler.rs:128`。这对将来用 `#[should_panic]` 写测试的 032 有实际影响 | 006 / 009 / 032 |
+| `App::add_event` 在 0.20 **已不存在** | 全量源码 grep 确认（只剩 `bevy_animation` 里一个同名无关方法）。0.19 起事件已经分成 message / event / entity-event 三类，注册分别用 `add_message` / `add_event`（自定义全局事件）—— 老的 `add_event::<T>()` 名字不再对应"消息"。照着老教程写会直接编译不过 | 012 / 016 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：

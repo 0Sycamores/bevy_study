@@ -45,20 +45,35 @@ fn tick(mut frame: Local<u32>) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 实测输出（0.20 实跑，`cargo run --example 001_app`）
+//
+//   [Startup] 整个 App 只跑这一次
+//   [Update] 第 1 帧
+//   —— .run() 已返回，进程结束 ——
+//
+// 三行、一次退出，正是「跑一帧就退」的样子。Update 只跑了第 1 帧。
+//
+// ─────────────────────────────────────────────────────────────────────
 // 为什么会退出？
 //
 // `App::new()` 其实就是 `App::default()`，而它内部先调用了 `App::empty()`，
 // 那里把 runner 设成了 `run_once`：
 //
-//     // bevy_app-0.19.1/src/app.rs:152
+//     // bevy_app-0.20.0/src/app.rs:152
 //     runner: Box::new(run_once),
 //
 // 而 `run_once` 的完整实现是：
 //
-//     // bevy_app-0.19.1/src/app.rs:1531
+//     // bevy_app-0.20.0/src/app.rs:1516
 //     fn run_once(mut app: App) -> AppExit {
-//         ...
+//         while app.plugins_state() == PluginsState::Adding {
+//             bevy_tasks::tick_global_task_pools_on_main_thread();
+//         }
+//         app.finish();                              // 所有插件的 build 跑完后的收尾
+//         app.cleanup();
+//
 //         app.update();                              // ← 只 update 这一次
+//
 //         app.should_exit().unwrap_or(AppExit::Success)
 //     }
 //

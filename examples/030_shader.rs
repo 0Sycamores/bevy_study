@@ -198,8 +198,8 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 // 报错的意思是"group 2 的 binding 0 在管线里是 storage buffer，不是 uniform"——
 // 也就是**撞到别的组上了**。
 //
-// 原因是 0.19 里材质 bind group 的**编号不是固定的**：引擎会根据启用的特性
-// （bindless 之类）动态决定，再通过预处理器变量注入。看引擎自己的
+// 原因是 0.19 起材质 bind group 的**编号不是固定的**（0.20 同）：引擎会
+// 根据启用的特性（bindless 之类）动态决定，再通过预处理器变量注入。看引擎自己的
 // `pbr_bindings.wesl` 就能发现它一个数字都没写死：
 //
 //     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: StandardMaterial;

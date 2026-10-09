@@ -184,6 +184,8 @@ fn show_removed(mut removed: RemovedComponents<Health>) {
 // ─────────────────────────────────────────────────────────────────────
 // 怎么看这份输出
 //
+// （0.20 实跑，同一份产物连跑 6 次逐字相同 —— 系统之间全 `chain` 了。）
+//
 // 盯着**敌人B** 那一行走势就够了：
 //
 //   · 它的值从头到尾都是 100，一次都没变
@@ -223,7 +225,11 @@ fn show_removed(mut removed: RemovedComponents<Health>) {
 //   1. 变更检测是**按系统**记进度的。同一个变更，A 系统看到了，B 系统也照样能看到 ——
 //      不存在"被谁读掉了"。所以 `show_changed` 和别的系统互不干扰。
 //   2. 想定位"到底哪一行改的"，可以开 `track_location` feature，然后用
-//      `Ref::changed_by()` 拿到文件与行号（调试用，别带到发布版）。
+//      `Ref::changed_by()` 拿到记录下来的位置。注意 0.20 里它返回的不是裸的
+//      `&Location`，而是 `MaybeLocation`（在 `bevy::ecs::change_detection::
+//      MaybeLocation`；**不在 prelude 里**，要么写全路径、要么自己 `use`）：
+//      feature 打开时是 `Some(&Location)`，没打开时恒为 `None`。
+//      调试用，别带到发布版。
 //
 // ─────────────────────────────────────────────────────────────────────
 // 什么时候值得用它

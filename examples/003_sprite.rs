@@ -6,7 +6,7 @@
 //!   Sprite        一个矩形色块（或贴图片）
 //!   Transform     位置 / 旋转 / 缩放
 //!   坐标系        右手系 Y-up：+X 右、+Y 上、+Z 朝你；2D 原点在窗口中心
-//!   必需组件      Sprite 会自动补上 Transform 和 Visibility
+//!   必需组件      Sprite 会自动补上 Transform、Visibility 等（见文末）
 //!
 //! 使用场景
 //!   画 2D 图形、摆放位置。坐标系的知识 2D / 3D 通用，027 讲 3D 时会直接复用
@@ -93,7 +93,8 @@ fn setup(mut commands: Commands) {
 // 为什么只写了 Sprite + Transform，精灵就能显示、能移动？
 //
 // 因为 Bevy 有"必需组件"(required components)：`Sprite` 声明了自己需要
-// `Transform` 和 `Visibility`，你 spawn 一个 `Sprite`，引擎会自动把缺的补上。
+// `Transform`、`Visibility`、`VisibilityClass`、`Anchor`，
+// 你 spawn 一个 `Sprite`，引擎会自动把缺的补上。
 //
 // 所以下面这样写也能跑，精灵会出现在原点：
 //
@@ -106,6 +107,11 @@ fn setup(mut commands: Commands) {
 //
 // 1. **z 相同时不保证顺序。** 两个精灵 z 相同时谁在前面，取决于内部的排序，
 //    引擎对此不做任何承诺。要控制层叠关系就给不同的 z，别依赖 spawn 先后。
+//
+//    ⚠️ 0.20 把 sprite 的渲染后端换成了 `Mesh2d` + `SpriteMaterial`，官方迁移
+//    指南特别提醒：**同一 Z 层级下的绘制顺序可能和 0.19 不一样**。所以这条
+//    "别依赖同层顺序"从"理论上不保证"变成了"真的会变"。
+//    本讲三个精灵写的是 0.0 / 1.0 / 2.0，不依赖任何默认顺序。
 //
 // 2. **旋转的正方向是逆时针。** `Quat::from_rotation_z(+90°)` 会把"向右"转成
 //    "向上"，在屏幕上看起来就是逆时针。这不是巧合：右手系里绕 +Z 的正向旋转，

@@ -210,7 +210,7 @@ fn toggle_mute_on_m(
 //
 // 想播 WAV 得开 `wav` feature（它会引入 `hound` 依赖）：
 //
-//     bevy = { version = "0.19.1", features = ["wav"] }
+//     bevy = { version = "0.20", features = ["wav"] }
 //
 // 想要全套格式用 `audio-all-formats`（aac / flac / mp3 / mp4 / vorbis / wav）。
 //

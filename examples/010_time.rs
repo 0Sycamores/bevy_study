@@ -289,7 +289,10 @@ fn report_clocks(
 //   ── 第 2 帧
 //        【写法③ Timer 组件】组件B 触发
 //        【Stopwatch】pause()  —— 此时 elapsed = 0.20s，之后冻结
-//        ...
+//        Time      delta 0.10s   elapsed 0.20s
+//        Repeating elapsed 0.20/0.25s   remaining 0.05s   fraction  80%   finished false
+//        Once      elapsed 0.20/0.35s   remaining 0.15s   fraction  57%   finished false
+//        Stopwatch elapsed 0.20s
 //   ── 第 3 帧
 //        【写法① 手动累加】触发（结转 0.05s）
 //        【写法② Timer 资源】触发
@@ -300,15 +303,24 @@ fn report_clocks(
 //        Stopwatch elapsed 0.20s
 //   ── 第 4 帧
 //        【Once + just_finished】只在这一帧为真
-//        ...
+//        【写法③ Timer 组件】组件B 触发
+//        【Stopwatch】unpause() —— 还是从 0.20s 继续
+//        Time      delta 0.10s   elapsed 0.40s
+//        Repeating elapsed 0.15/0.25s   remaining 0.10s   fraction  60%   finished false
 //        Once      elapsed 0.35/0.35s   remaining 0.00s   fraction 100%   finished true
+//        Stopwatch elapsed 0.20s
 //   ── 第 5 帧
 //        【写法① 手动累加】触发（结转 0.00s）
 //        【写法② Timer 资源】触发
-//        【写法③ Timer 组件】组件A 触发 / 组件B 触发
-//        ...
+//        【写法③ Timer 组件】组件A 触发
+//        【写法③ Timer 组件】组件B 触发
+//        【Stopwatch】reset()  —— 归零前 elapsed = 0.30s
+//        Time      delta 0.10s   elapsed 0.50s
 //        Repeating elapsed 0.00/0.25s   remaining 0.25s   fraction   0%   finished true
 //        Once      elapsed 0.35/0.35s   remaining 0.00s   fraction 100%   finished true
+//        Stopwatch elapsed 0.00s
+//
+// （以上是第一段的**完整**输出，除末尾的【小结】外没有省略。同一份产物连跑 5 次逐字相同。）
 //
 // 三件事值得盯住：
 //   1. 第 3 帧：三种写法**在同一帧触发** —— 它们等价，只是组织方式不同。
@@ -321,13 +333,50 @@ fn report_clocks(
 // ── 实测输出（第二段：按真实时间走，数字会有 ±2ms 浮动，看趋势即可）
 //
 //   ── 正常
-//        Time.delta   100.3ms   Real.delta   100.3ms   Virtual.delta   100.3ms   paused=false  speed=1
+//        Time.delta   100.8ms   Real.delta   100.8ms   Virtual.delta   100.8ms   paused=false  speed=1
+//        Time.delta   100.8ms   Real.delta   100.8ms   Virtual.delta   100.8ms   paused=false  speed=1
 //   ── 暂停
-//        Time.delta     0.0ms   Real.delta   100.3ms   Virtual.delta     0.0ms   paused=true  speed=1
+//        Time.delta     0.0ms   Real.delta   100.7ms   Virtual.delta     0.0ms   paused=true  speed=1
+//        Time.delta     0.0ms   Real.delta   100.7ms   Virtual.delta     0.0ms   paused=true  speed=1
 //   ── 3 倍速
-//        Time.delta   302.0ms   Real.delta   100.7ms   Virtual.delta   302.0ms   paused=false  speed=3
+//        Time.delta   250.0ms   Real.delta   100.7ms   Virtual.delta   250.0ms   paused=false  speed=3
+//        Time.delta   250.0ms   Real.delta   100.5ms   Virtual.delta   250.0ms   paused=false  speed=3
 //
-// 三行的对比就是全部结论：**暂停只冻结虚拟时钟，真实时间照走**；倍速只放大虚拟时钟。
+// 每个阶段都会 `update` 两次，所以每个标题下面是两行。
+//
+// ⚠️ **3 倍速那一格不是 300ms，而是 250ms 封顶** —— 这不是笔误，是 0.20 的一处真实行为变化。
+//    `Time<Virtual>` 有一个 `max_delta`（默认 `DEFAULT_MAX_DELTA = 250ms`），
+//    用来防止长时间卡顿后一帧推进太多。两个版本的裁剪时机不同：
+//
+//        // 0.20：先乘倍速，再裁剪（bevy_time-0.20.0/src/virt.rs:249，略去 tracing）
+//        let scaled = raw_delta.mul_f64(speed);
+//        let (effective_speed, delta) = if scaled > max_delta {
+//            (max_delta.as_secs_f64() / raw_delta.as_secs_f64(), max_delta)
+//        } else {
+//            (speed, scaled)
+//        };
+//
+//        // 0.19：先裁剪，再乘倍速（所以 100ms × 3 = 300ms 能突破 250ms）
+//        // bevy_time-0.19.1/src/virt.rs:240，同样略去 tracing
+//        let clamped_delta = if raw_delta > max_delta { max_delta } else { raw_delta };
+//        let delta = clamped_delta.mul_f64(effective_speed);
+//
+//    结果就是：0.20 里**倍速放大后的结果同样受 `max_delta` 限制**，
+//    真实帧长约 100ms 时设 `set_relative_speed(3.0)`，实际只推进约 250ms（≈2.5 倍）。
+//    注意 `effective_speed` 这时会被改写成 `max_delta / raw_delta`
+//    （按实测的 raw ≈ 100.7ms 算约 2.48），而 `relative_speed()` 依然报 3.0 ——
+//    一个"名义倍速"、一个"实际倍速"。
+//    想让高倍速真正生效，得把上限一起调大（对 `Time<Virtual>` 资源调用）：
+//
+//        app.world_mut().resource_mut::<Time<Virtual>>()
+//            .set_max_delta(Duration::from_secs(1));
+//
+// 三行的对比就是全部结论：**暂停只冻结虚拟时钟，真实时间照走**；
+// 倍速只放大虚拟时钟，而且放大幅度会被 `max_delta` 截断。
+//
+// 稳定性：第一段完全由 `advance_by(100ms)` 驱动、没有真实时钟参与，同一份产物连跑 5 次
+// 逐字相同，可以逐字复核；第二段靠 `sleep` 计时，数字有 ±2ms 浮动，只看趋势
+// （暂停那一行 `Real.delta` 照走才是结论的关键）。
 //
 // ─────────────────────────────────────────────────────────────────────
 // Timer 的完整 API 一览（本讲出现过的）
@@ -344,6 +393,19 @@ fn report_clocks(
 //   set_duration(..) / set_elapsed(..)      运行时改时长 / 改进度
 //
 //   Stopwatch                               只计时、永不 finished；有 elapsed() / pause() / reset()
+//
+// Time<Virtual> 专用（第二段用到的都在这里）：
+//
+//   pause() / unpause() / is_paused()       冻结 / 恢复 / 查是否暂停
+//   set_relative_speed(f64) / relative_speed()
+//                                           设置 / 读取名义倍速（上面打印的 speed=3 就是这个）
+//   effective_speed()                       本帧实际生效的倍速；
+//                                           被 `max_delta` 截断时它与 relative_speed 不同
+//   max_delta() / set_max_delta(Duration)   单帧推进上限，**默认 250ms**（0.20 里倍速结果也受它限制）
+//   from_max_delta(Duration)                带自定义上限构造一个 Time<Virtual>
+//
+// 注意 `Time::<Fixed>::from_hz(60.0)` 这类"构造器"是关联函数，
+// 而 `set_max_delta(..)` 是方法，要用 `resource_mut::<Time<Virtual>>()` 拿到后再调。
 //
 // ─────────────────────────────────────────────────────────────────────
 // 三种驱动写法怎么选

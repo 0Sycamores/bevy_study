@@ -7,7 +7,7 @@
 //!   px(..) / percent(..)  长度单位：逻辑像素 / 父容器的百分比
 //!   Text / TextFont / TextColor   文字
 //!   ImageNode           在 UI 里显示图片
-//!   BackgroundColor / BorderColor / BorderColor   底色与边框
+//!   BackgroundColor / BorderColor   底色与边框
 //!   ZIndex              层叠顺序（UI 内部的 z）
 //!
 //! 使用场景
@@ -165,7 +165,7 @@ fn update_hud(
 // 跑起来会看到什么
 //
 //   左上角：一张 64×64 的小图片（就是 020 加载的那个 logo）
-//   右上角：文字「血量 xx」，每 0.4 秒跟着数字变一次
+//   右上角：文字「HP xx」，每 0.4 秒跟着数字变一次
 //   底部中间：一条血条，红色填充随血量伸缩；掉到 0 会回满再来一轮
 //
 // 三块东西用的三种定位方式，正好覆盖 UI 的常见套路：
@@ -211,25 +211,28 @@ fn update_hud(
 // Bevy 内置的默认字体是 `FiraMono-subset.ttf`（拉丁字母等宽字体），
 // **不含任何汉字字形**。直接写 `Text::new("血量")` 的结果是：
 //
-//   · 终端刷一片警告（实测）：
+//   · 终端会打出一行警告（实测：**只打一行**，不会刷屏）：
 //       ICU4X data error: No segmentation model for complex script: Chinese/Japanese
 //   · 画面上那几个字根本渲染不出来（空白或豆腐块）
 //
 // 这不属于"配置一下就好"，而是**必须自己提供一份中文字体**：
 //
-//   let font = asset_server.load("fonts/某中文字体.ttf");
+//   let font: Handle<Font> = asset_server.load("fonts/某中文字体.ttf");
 //   commands.spawn((
 //       Text::new("血量 100"),
 //       TextFont {
-//           font: font.clone(),            // ← 换成自己的字体
+//           // ⚠️ `font` 字段的类型是 `FontSource`，**不是** `Handle<Font>` ——
+//           //    所以句柄要 `.into()`（等价写法：`FontSource::Handle(font.clone())`）
+//           font: font.clone().into(),
 //           font_size: FontSize::Px(28.0),
 //           ..default()
 //       },
 //   ));
 //
 // 字体从哪来（都不用下载）：
-//   · **系统字体**：开 `system_font_discovery` feature，用
-//     `Font::from_system(..)` 引用系统里已有的中文字体，不必把字体文件放进仓库
+//   · **系统字体**：开 `system_font_discovery` feature，然后用
+//     `FontSource::family("系统里那个字体的家族名")` 按**家族名**引用，
+//     不必把字体文件放进仓库
 //   · 自己放一份进 `assets/fonts/`（注意字体授权）
 //
 // 本项目为了不引入二进制依赖，UI 文本统一用英文。
@@ -248,4 +251,8 @@ fn update_hud(
 // · **改文字就是改 `String`**：`text.0 = format!(..)` —— `Text` 就是个 `String` 包装。
 // · **别每帧无脑刷新 UI**。布局重排是有成本的，用 015 的变更检测
 //   （像本讲的 `update_hud` 那样先问一句 `is_changed()`）能省下大量重复计算。
+// · **默认字号变了**：`TextFont::default()` 的 `font_size` 在 0.20 是
+//   `FontSize::Rem(1.)`（0.19 是 `FontSize::Px(20.)`）。`Rem` 相对 `RemSize`
+//   资源（默认 20px），所以**视觉上一样**，但含义不再是"写死 20 像素"。
+//   本讲写的是 `FontSize::Px(28.0)`，不受影响。
 // ─────────────────────────────────────────────────────────────────────

@@ -164,7 +164,8 @@ App::new()
 WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   1 pairs of systems with conflicting data access have indeterminate execution order.
   Consider adding `before`, `after`, or `ambiguous_with` relationships ...
-   -- <Enable the debug feature to see the name> (in set Battle) and ... (in set Battle)
+   -- check_death (in set Battle) and apply_damage (in set Battle)
+      conflict on: ["004_schedule::Health"]
 ```
 
 - **三句话版本**：
@@ -183,10 +184,11 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 - **两种修法（都已实测）**：
   - 改法 ①：`check_death.in_set(Battle).after(apply_damage)` → 得分变 `100`，WARN 消失。
   - 改法 ②：`(new_wave, apply_damage, check_death).chain().in_set(Battle)` → 效果相同。
-- **看不到系统名？** Bevy 默认把名字藏起来了（那几处 `<Enable the debug feature ...>`）。在 `Cargo.toml` 里打开即可：
+- **为什么警告里直接写了系统名？** 靠 `Cargo.toml` 里开着的 `dev`（含 `debug`）：
   ```toml
   bevy = { version = "0.20", features = ["dev"] }
   ```
+  没开 `debug` 时，那几处名字会退化成 `<Enable the debug feature to see the name>` —— 警告照样发，但不告诉你是谁在冲突。
 
 ---
 

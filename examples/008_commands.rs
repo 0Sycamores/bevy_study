@@ -134,6 +134,8 @@ fn count_final(enemies: Query<&Enemy>) {
 //   ⑤ despawn_weakest      排队销毁 7v0
 //   ⑥ count_final          → 还剩 2 个敌人
 //
+// （0.20 实跑，同一份产物连跑 6 次输出逐字相同 —— 包括 `7v0` 这个实体编号。）
+//
 // ① 里的 "0 → 0" 是本讲的核心：命令是延迟的，同一系统内排队后立刻查也查不到。
 //
 // ⑤ 里那个 `7v0` 就是实体的 Debug 格式，写作 `索引v代数`：
@@ -152,9 +154,18 @@ fn count_final(enemies: Query<&Enemy>) {
 // 第 2 条由 `ScheduleBuildSettings::auto_insert_apply_deferred` 控制，
 // **默认就是 `true`**。所以上面 `.chain()` 之后，每一步都能看到上一步的结果。
 //
-// 实测对比：把 `.chain()` 去掉，写成 `(spawn_enemies, count_enemies)`，
-// `② count_enemies` 会打印 **0 个** —— 因为它可能排在 `spawn_enemies` 之前。
-// 换句话说，**不声明顺序，命令什么时候生效就不确定**，这又是 004 讲的顺序问题。
+// 实测对比（0.20）：把这两个系统单独拎出来、去掉 `.chain()`，写成
+// `(spawn_enemies, count_enemies)`，跑 3 帧 × 10 次 —— `② count_enemies`
+// **每次都打印 0 个**，命令要等整个 `Update` 跑完才落地。
+//
+// 再细看一层：这 10 次里 `count_enemies` 与 `spawn_enemies` 的相对顺序出现了
+// 4 种不同排列（有时 count 先跑，有时 spawn 先跑），**但结果都一样**。
+// 原因是：一旦缺少排序边，Bevy 就不会在两者之间自动插 `ApplyDeferred` ——
+// 哪怕 `spawn_enemies` 先跑，它的命令也只是躺在队列里，
+// `count_enemies` 照样看到 0 个。
+//
+// 所以"不声明顺序，命令什么时候生效就不确定"更准确的说法是：
+// **落地时机被推到了 Schedule 末尾。** 这又是 004 讲的顺序问题。
 //
 // ── 三种控制同步点的方式 ──
 //

@@ -167,6 +167,9 @@ fn list_props(props: Query<&Label, (Without<Player>, Without<Enemy>)>) {
 //        玩家     HP = 100
 //   ── (Without<Player>, Without<Enemy>) 命中 1 个：石柱
 //
+// （同一份产物连跑 8 次，输出逐字相同 —— `.chain()` 把系统顺序钉死了；
+//   但下面要说的"原型分组"只保证稳定，不保证等于生成顺序。）
+//
 // 四个查询、四种筛法，石柱该被排除时被排除、该被单独挑出来时被挑出来。
 //
 // ⚠️ 注意遍历顺序同样**不是生成顺序**：生成顺序是"玩家、敌人A、敌人B、石柱"，
@@ -193,14 +196,24 @@ fn list_props(props: Query<&Label, (Without<Player>, Without<Enemy>)>) {
 // 冲突：这是运行时 panic，不是编译错误
 //
 // 把 `mirror_enemies` 里的 `Without<Player>` 去掉，代码**照样编译通过**
-// （`cargo check` 不会有任何意见），但一运行就 panic：
+// （`cargo check` 不会有任何意见），但一运行就 panic。
+// 下面是 0.20 实测原文（临时去掉那半句，跑完立刻还原；退出码 101）：
 //
-//   thread 'main' panicked at bevy_ecs-0.19.1/src/query/state.rs:216:13:
-//   error[B0001]: Query<...> in system ... accesses component(s) ... in a way
-//   that conflicts with a previous system parameter.
-//   Consider using `Without<T>` to create disjoint Queries or merging
-//   conflicting Queries into a `ParamSet`.
+//   thread 'main' (...) panicked at
+//   .../bevy_ecs-0.20.0/src/query/state.rs:216:13:
+//   error[B0001]: Query<(&Label, &mut Transform), With<Enemy>> in system
+//   007_query_filter::mirror_enemies accesses component(s) Transform in a way that
+//   conflicts with a previous system parameter. Consider using `Without<T>` to
+//   create disjoint Queries or merging conflicting Queries into a `ParamSet`.
 //   See: https://bevy.org/learn/errors/b0001
+//
+// 注意两点：
+//   · `Query<...>` 里印的是**真实的查询类型**，`in system` 后面是
+//     **真实的系统路径** `007_query_filter::mirror_enemies`。
+//     `dev` 特性打开了 `debug`，所以不再有 `<Enable the debug feature to see the name>`
+//     这类占位文字（这点和 004 讲的调度警告是同一个机制）。
+//   · 这次 panic 在 `main` 线程上，且发生在系统**初始化**阶段 ——
+//     所以什么都还没来得及打印就结束了。
 //
 // 所以"编译过了"不代表查询没问题 —— 这类冲突只在系统真正跑起来时才暴露。
 // 报错信息自己给了两种修法：

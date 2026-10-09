@@ -168,6 +168,9 @@ impl PluginGroup for GamePlugins {
 //      [敌人插件] 小兵乙 抵达终点，+10 分
 //      [分数插件] Score = 20
 //
+// （0.20 实跑，同一份产物连跑 6 次逐字相同。跨插件的组间顺序由
+//   `configure_sets` 显式声明，所以这里没有留给调度器自由发挥的余地。）
+//
 // 两处值得说明：
 //
 // 1. 第 1 帧那行 `Score = 0` 有点意外 —— 分数明明没加过。
@@ -179,6 +182,13 @@ impl PluginGroup for GamePlugins {
 //    这正是 004 讲的顺序问题，只不过跨了插件边界 —— 修法是给系统分组、
 //    在**一个地方**声明组间顺序。
 //
+//    这条 0.20 复测过（临时把 `.in_set(..)` 和 `configure_sets(..)` 都去掉，
+//    把 `report_score` 放在 `(report_score, move_enemies, check_arrival)` 的最前面）：
+//    `[分数插件] Score = 20` **一次都没出现**，第 3 帧只打印了两行 `[敌人插件]`。
+//    原因是那一帧 `report_score` 先跑（分数还是 0，且它是"刚创建"才算变更，
+//    第 3 帧不再算变更），等 `check_arrival` 加分时已经没人再看它了。
+//    换句话说：**加了分却没人报，静默丢失。**
+//
 // ─────────────────────────────────────────────────────────────────────
 // 插件到底做了什么
 //
@@ -186,10 +196,16 @@ impl PluginGroup for GamePlugins {
 //
 //   app.init_resource::<T>() / insert_resource(..)     注册资源
 //   app.add_systems(Update, ..)                        注册系统
-//   app.add_message::<T>() / add_event::<T>()          注册消息 / 事件
-//   app.add_observer(..)                               注册观察者
+//   app.add_message::<T>()                             注册消息（`#[derive(Message)]`，012 讲）
+//   app.add_observer(..)                               注册观察者（013 讲）
 //   app.init_state::<S>()                              注册状态（018 讲）
 //   app.add_plugins(别的插件)                          插件还能装插件
+//
+// ⚠️ 0.20 里**没有 `app.add_event::<T>()`**。事件分成两类之后（012/013 讲）：
+//   · 要"缓冲两帧、谁都能读"的消息 → `add_message::<T>()` 注册
+//   · 走观察者的 `Event` / `EntityEvent` → 不用单独注册，
+//     `add_observer(..)` / `commands.trigger(..)` 自己会把它登记进 World
+// 照着老教程写 `add_event` 会直接编译不过（没有这个方法）。
 //
 // 所以插件不是一个新概念，它只是**把一段配置搬了个家** ——
 // 从"堆在 main 里"变成"归属于某个功能模块"。

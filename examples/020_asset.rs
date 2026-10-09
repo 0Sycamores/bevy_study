@@ -229,7 +229,8 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 // ⚠️ 注意 `file_watcher` **不是**默认 feature，它属于 `dev` 特性组：
 //
 //     default = ["2d", "3d", "ui", "audio"]                  ← 只有这几个
-//     dev     = ["debug", "bevy_dev_tools", "file_watcher"]  ← 热重载在这里
+//     dev     = ["debug", "bevy_dev_tools", "render_dev_tools", "file_watcher"]
+//                                                              ↑ 热重载在这里
 //
 // **本项目已经开了 `dev`**：
 //
@@ -241,11 +242,14 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 // 如果你的项目没开 `dev`，改素材不会触发任何更新；那时要么加上这个 feature，
 // 要么每次重启程序。
 //
-// 建议开 `dev` 而不是只开 `file_watcher`，因为它一次给三样东西：
-//   · `file_watcher`    —— 热重载（改素材不用重启）
-//   · `debug`           —— 让 panic 与顺序歧义警告**显示系统名**
+// 建议开 `dev` 而不是只开 `file_watcher`，因为它一次给四样东西：
+//   · `file_watcher`      —— 热重载（改素材不用重启）
+//   · `debug`             —— 让 panic 与顺序歧义警告**显示系统名**
 //     （否则只能看到 `<Enable the debug feature to see the name>`，004 讲过）
-//   · `bevy_dev_tools`  —— FPS 悬浮窗、状态切换日志等调试工具
+//   · `bevy_dev_tools`    —— 状态切换日志、世界检查等调试工具
+//   · `render_dev_tools`  —— 也就是 `bevy_dev_tools/render`：FPS 悬浮窗、渲染调试
+//     面板、连拍截图、无限网格 —— 这一组在 0.20 才从 `bevy_dev_tools` 里拆出来，
+//     所以 0.19 的 `dev` 里没有它
 //
 // 代价是编译更久、二进制更大。**学习期间开 `dev` 相当划算**，
 // 因为几乎所有报错信息都会清楚得多。

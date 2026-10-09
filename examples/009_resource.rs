@@ -94,6 +94,8 @@ fn skip_if_missing(_value: Res<NeverRegistered>) {
 //
 // 注意 `skip_if_missing` **一行输出都没有** —— 运行条件不成立，整个系统被跳过。
 //
+// （0.20 实跑，同一份产物连跑 6 次输出逐字相同。）
+//
 // ─────────────────────────────────────────────────────────────────────
 // 组件 vs 资源
 //
@@ -114,7 +116,7 @@ fn skip_if_missing(_value: Res<NeverRegistered>) {
 //   `init_resource::<T>()`  要求 `T: Default`，用默认值建
 //   `insert_resource(v)`    自己给值；`T` 没有 `Default` 时只能用它
 //
-// 实测两者在"资源已存在"时的行为**不同**：
+// 实测（0.20）两者在"资源已存在"时的行为**不同**：
 //
 //   insert_resource(Counter(42)) → 再 init_resource::<Counter>()  → 仍是 42（**不覆盖**）
 //   init_resource::<Counter>()   → 再 insert_resource(Counter(7)) → 变成 7（**覆盖**）
@@ -126,13 +128,25 @@ fn skip_if_missing(_value: Res<NeverRegistered>) {
 // ⚠️ 资源不存在时：直接 panic
 //
 // 这是 006 讲过的"三种反应"里最凶的一种。把 `skip_if_missing` 的运行条件去掉、
-// 直接注册进 `Update`，一运行就 panic：
+// 直接注册进 `Update`，一运行就 panic。0.20 实测原文（跑完立刻还原；退出码 101）：
 //
-//   Encountered an error in system ...: Parameter ... failed validation:
-//   Resource does not exist
+//   thread 'TaskPool (2)' (...) panicked at
+//   .../bevy_ecs-0.20.0/src/error/handler.rs:128:1:
+//   Encountered an error in system `009_resource::skip_if_missing`: Parameter
+//   `Res<NeverRegistered>` failed validation: Resource does not exist
 //   If this is an expected state, wrap the parameter in `Option<T>` and
 //   handle `None` when it happens, or wrap the parameter in `If<T>` to
 //   skip the system when it happens.
+//
+// 三点值得注意（和 0.19 时代的写法不同）：
+//   · 系统名、参数名都是真的（`009_resource::skip_if_missing`、
+//     `Res<NeverRegistered>`）—— `dev` 特性打开了 `debug`。
+//   · panic 打在 **TaskPool 工作线程**上，而且同一 Schedule 里**其它系统照样跑完**：
+//     实测这一次 `gain_score` 之后炸，`award_bonus` / `report` /
+//     `report_optional` 三行输出仍然照常打印，最后才以退出码 101 收场。
+//   · 报错源头是 `bevy_ecs` 的 `FallbackErrorHandler`
+//     （`error/handler.rs` 里的 `match_severity`），它**默认仍然重新 panic**，
+//     所以"缺资源会炸"这条结论在 0.20 没有变软。
 //
 // 三种应对方式：
 //   ① `Option<Res<T>>`                允许不存在，自己处理 None        ← report_optional

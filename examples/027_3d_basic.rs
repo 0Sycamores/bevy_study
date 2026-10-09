@@ -86,7 +86,7 @@ fn setup(
     // 主光：平行光。它没有"位置"只有"方向"，所以靠 `Transform` 的朝向决定照向哪边。
     commands.spawn((
         DirectionalLight {
-            // ⚠️ 0.19 的字段名是 `shadow_maps_enabled`（旧版叫 `shadows_enabled`）
+            // ⚠️ 0.19 的字段名是 `shadow_maps_enabled`（旧版叫 `shadows_enabled`；0.20 同）
             shadow_maps_enabled: true,
             illuminance: 6_000.0,
             ..default()
@@ -203,7 +203,7 @@ fn spin(time: Res<Time>, mut spinners: Query<&mut Transform, With<Spin>>) {
 //   `PointLight`        点光源：灯泡。有位置、有距离衰减，亮度用 `intensity`
 //   `SpotLight`         聚光灯：有锥角、有方向
 //
-// 三个都有 `shadow_maps_enabled`（0.19 的字段名，旧版是 `shadows_enabled`）——
+// 三个都有 `shadow_maps_enabled`（0.19 的字段名，旧版是 `shadows_enabled`；0.20 同）——
 // 打开后该光源就会投影。
 //
 // 环境光要注意 0.19 的一个改动：

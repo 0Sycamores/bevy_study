@@ -261,7 +261,7 @@ fn on_scene_ready(
 //         }
 //     }
 //
-// 注意 0.19 里播放动画还需要 `AnimationGraphHandle`（一套动画图），
+// 注意 0.19 起播放动画还需要 `AnimationGraphHandle`（一套动画图；0.20 同），
 // 有专门的 `examples/animation/` 系列讲这件事 —— 本讲没有现场演示，
 // 因为它的主体是**动画系统**而不是"加载 glTF"，按"一讲一个概念"的原则留给后续。
 //
