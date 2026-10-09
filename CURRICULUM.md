@@ -54,7 +54,7 @@
 #### 001 `001_app.rs` — 最小 App
 - **目标**：看清一个 Bevy 程序的三件套：`App`、系统、`Schedule`。
 - **核心 API**：`App::new()`、`add_systems(Update, ..)`、`App::run()`、`Startup`。
-- **观察点**：不挂 `DefaultPlugins` 时，默认 runner 是 `run_once`（`bevy_app-0.19.1/src/app.rs:152`）——所以只打印一次就退出，**不是**死循环。再把 `DefaultPlugins` 加上，程序会卡住并弹窗，对比同一份代码的两种命运。
+- **观察点**：不挂 `DefaultPlugins` 时，默认 runner 是 `run_once`（`bevy_app-0.20.0/src/app.rs:192`）——所以只打印一次就退出，**不是**死循环。再把 `DefaultPlugins` 加上，程序会卡住并弹窗，对比同一份代码的两种命运。
 
 #### 002 `002_window.rs` — 窗口与相机
 - **目标**：让画面真的出现，理解"渲染需要相机"。
@@ -100,7 +100,7 @@
 #### 006 `006_query.rs` — 查询的几种写法 ✅ 已实现
 - **目标**：同一件事的多种查询姿势，对应本项目"同一件事多种写法对照"的定位。
 - **核心 API**：`query.iter()`、`iter_mut()`、`single()`（返回 `Result`）、`get(entity)`、`par_iter()`、`Query::iter_many`。
-- **观察点**：`single()` 在 0.19 返回 `Result`——实体不存在时是 `Err` 而不是 panic，顺势讲"为什么 Bevy 把参数失败设计成跳过系统"。
+- **观察点**：`single()` 返回 `Result`——实体不存在时是 `Err` 而不是 panic，顺势讲"为什么 Bevy 把参数失败设计成跳过系统"。
 - **前置**：005。
 
 #### 007 `007_query_filter.rs` — 查询过滤与冲突 ✅ 已实现
@@ -152,7 +152,7 @@
   相机的玩法（跟随/缩放/分屏）指向 025。
 - **前置**：009、010。
 
-#### 012 `012_message.rs` — 消息（0.17 起由 Event 改名） ✅ 已实现
+#### 012 `012_message.rs` — 消息 ✅ 已实现
 - **目标**：系统间解耦通信。
 - **核心 API**：`#[derive(Message)]`、`app.add_message::<T>()`、`MessageWriter::write`、`MessageReader::read`、`MessageMutator`、`MessageReader` 的双缓冲语义。
 - **观察点**：
@@ -209,7 +209,7 @@
 
 #### 019 `019_state_advanced.rs` — 状态进阶 ✅ 已实现
 - **目标**：复杂流程下的状态组合。
-- **核心 API**：`SubStates`（依附父状态存在）、`ComputedStates`（由其他状态推导）、`DespawnOnExit(S)`/`DespawnOnEnter(S)`/`DespawnWhen::new(..)`（0.19 的自动清理，旧名 `StateScoped` 已废弃）。
+- **核心 API**：`SubStates`（依附父状态存在）、`ComputedStates`（由其他状态推导）、`DespawnOnExit(S)`/`DespawnOnEnter(S)`/`DespawnWhen::new(..)`（随状态自动清理）。
 - **观察点**：`DespawnOnExit` 挂上去之后，切状态时实体**自动**销毁，不用手写清理系统——顺手对比"手写 `OnExit` 清理"的写法有多啰嗦。
 - **前置**：018。
 
@@ -240,7 +240,7 @@
 #### 023 `023_ui_interaction.rs` — UI 交互 ✅ 已实现
 - **目标**：按钮能点、能被鼠标悬停。
 - **核心 API**：`Button`、`Interaction`（`None`/`Hovered`/`Pressed`）、`Changed<Interaction>`、UI 上的 `observe`（`Pointer<Click>`/`Pointer<Over>`）、`BackgroundColor` 反馈。
-- **观察点**：两种写法对照——**轮询** `Changed<Interaction>` vs **观察者** `On<Pointer<Click>>`；后者是 0.19 的推荐路径，也更省系统。
+- **观察点**：两种写法对照——**轮询** `Changed<Interaction>` vs **观察者** `On<Pointer<Click>>`；后者也更省系统。
 - **前置**：015、018、022。
 
 #### 024 `024_audio.rs` — 音频 ✅ 已实现
@@ -273,7 +273,7 @@
 
 #### 028 `028_3d_gltf.rs` — 加载 glTF 模型 ✅ 已实现
 - **目标**：用美术做好的模型，而不是代码拼几何体。
-- **核心 API**：`WorldAssetRoot(handle)`（**0.19 改名，旧名 `SceneRoot`**）、`AssetServer::load` + `GltfAssetLabel::Scene(0)`、`Scene`/`SceneInstance`、glTF 动画播放（`AnimationPlayer`/`AnimationGraph`）。
+- **核心 API**：`WorldAssetRoot(handle)`、`AssetServer::load` + `GltfAssetLabel::Scene(0)`、`Scene`/`SceneInstance`、glTF 动画播放（`AnimationPlayer`/`AnimationGraph`）。
 - **观察点**：glTF 场景**不是**一个实体，而是一棵被实例化出来的实体树；想改其中的材质要用 `SceneInstance` 就绪后再查，不能立刻 `Query`。
 - **前置**：020、027。
 
@@ -367,9 +367,9 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 412 个 `.rs` 文件，按主题分目录（`ecs/`、`state/`、`time/`、`ui/`、`picking/`、`shader/` …）；
 测试示例在 `bevy-0.20.0\tests\how_to_test_apps.rs` 与 `how_to_test_systems.rs`（对应 032）。
 
-### 4.3 已核实的 API 变更（写代码时别用旧名）
+### 4.3 容易写错的名字（照旧教程写会编译不过）
 
-| 旧写法 | 0.19.1 正确写法 | 影响讲次 |
+| 别用 | 用这个 | 影响讲次 |
 |---|---|---|
 | `Event` / `EventWriter` / `EventReader` / `add_event` | `Message` / `MessageWriter` / `MessageReader` / `add_message` | 012 |
 | `StateScoped(S)` | `DespawnOnExit(S)` / `DespawnOnEnter(S)` / `DespawnWhen::new(..)` | 019 |
@@ -387,18 +387,18 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 - 全部实施后重写 `README.md` 的课程表；在实施完成前，README 顶部保留"正在按 `CURRICULUM.md` 重排"的提示，避免编号混淆。
 - 每讲结束后跑 `cargo check --all-targets`，要求零警告再进下一讲。
 
-### 4.5 实测行为（不是改名，是语义；随版本升级需重新核对）
+### 4.5 实测行为（语义层面，不是名字问题）
 
 以下几条都是**实跑验证过的**，写后续讲次时直接采信，不要再凭印象：
 
 | 事实 | 实测结论 | 影响讲次 |
 |---|---|---|
-| 系统参数校验失败 | **分两类**：① `Single` / `Option<Single>` / `Populated` 条件不满足 → **静默跳过整个系统**（无输出、无报错、不 panic）；② 缺 `Res<T>` / `ResMut<T>` → **直接 panic**（`Resource does not exist`，exit 101）。错误处理器是 `FallbackErrorHandler`（0.19 由 `DefaultErrorHandler` 改名），默认 `match_severity`，`DefaultPlugins` **不会**改它 | 006 |
+| 系统参数校验失败 | **分两类**：① `Single` / `Option<Single>` / `Populated` 条件不满足 → **静默跳过整个系统**（无输出、无报错、不 panic）；② 缺 `Res<T>` / `ResMut<T>` → **直接 panic**（`Resource does not exist`，exit 101）。错误处理器是 `FallbackErrorHandler`，默认 `match_severity`，`DefaultPlugins` **不会**改它 | 006 |
 | 同一系统内两个查询的借用冲突 | **运行时 panic**，错误码 `B0001`，**不是编译错误** —— `cargo check` 照样通过。修法：`Without<T>` 造互斥查询，或 `ParamSet` 合并 | 007 |
 | `Query` 遍历顺序 | **不是生成顺序**。Bevy 按原型(archetype)分组存储，遍历**逐组**进行，组间先后与生成时间无关，不可依赖 | 006 |
 | `Commands` 何时落地 | `ScheduleBuildSettings::auto_insert_apply_deferred` **默认为 `true`**：`.chain()` / `.after()` 会在"有延迟参数的系统 → 读相关数据的系统"这条边上自动插 `ApplyDeferred`。不声明顺序则落地时机不定（实测同帧内可查到 0 个）。`chain_ignore_deferred()` 只排序、不插同步点 | 008 |
 | `Has<T>` 的位置 | 它是**取数项**（写在元组里、返回 `bool`），**不是**过滤器；`With` / `Without` / `Or` 才是过滤器（写在第二个参数位置） | 007 |
-| `Time` / `Time<Real>` / `Time<Virtual>` | 系统里 `Res<Time>` 拿到的就是**虚拟时钟**。实测（每帧真实流逝 ~100ms）：正常 Time=Real=Virtual≈100ms；`pause()` 后 Time=Virtual=**0** 而 Real 仍 ≈100ms；`set_relative_speed(3.0)` 后 Time=Virtual≈**300ms**、Real≈100ms（**0.20 实测已变为 250ms 封顶，见下方 0.20 补充行**）。暂停/慢动作只需改 `Time<Virtual>` | 010 |
+| `Time` / `Time<Real>` / `Time<Virtual>` | 系统里 `Res<Time>` 拿到的就是**虚拟时钟**。实测（每帧真实流逝 ~100ms）：正常 Time=Real=Virtual≈100ms；`pause()` 后 Time=Virtual=**0** 而 Real 仍 ≈100ms；`set_relative_speed(3.0)` 后 Time=Virtual≈**250ms 封顶**、Real≈100ms（上限来自 `DEFAULT_MAX_DELTA = 250ms`；想要更高的倍速得自己调大 `set_max_delta`）。暂停/慢动作只需改 `Time<Virtual>` | 010 |
 | 手动推进时间 | 不装 `TimePlugin` 时 `init_resource::<Time>()` + `Time::advance_by(dur)` 可精确控制（delta 即所给值）；**装了 `TimePlugin` 则手动 `advance_by(Time<Real>)` 会被插件覆盖**（实测无效） | 010 / 012 |
 | 无窗口多帧推进 | 直接 `app.update()` 循环即可，**不需要** `run()`，也不会因"插件还在构建"而 panic（实测） | 010 / 012 |
 | 消息的生命周期 | **双缓冲，只活两帧**：写在第 N 帧 → 第 N、N+1 帧可读 → 第 N+2 帧消失。实测一条只写一次的消息：读者排在前时第 1 帧读 0、第 2 帧读 1、第 3 帧读 0 | 012 |
@@ -421,18 +421,16 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 | UI 交互不要用 `Interaction::Pressed` 当"点击" | `Pressed` 在按住期间**持续为真**（与 011 的 `pressed` 同理）。要单次触发，用 `Changed<Interaction>` 过滤，或改用 `On<Pointer<Click>>` 观察者 | 023 |
 | 3D 网格拾取必须手动装插件 | `MeshPickingPlugin` **不是**默认插件（UI / 2D 精灵拾取才是）。不加时观察者完全不触发，且 **stderr 无任何 WARN/ERROR**（已实测：临时注释该行后程序照常启动、stderr 为空） | 029 |
 | glTF 的节点 ≠ 网格实体 | glTF 里带 `Mesh3d` 的是命名节点的**子实体**（名字形如 `Pyramid.PyramidMaterial`）。按节点名直接改材质会**静默失败**。文件 3 个节点实例化出 6 个实体（scene 本身 + 每个图元各一个） | 028 |
-| `WorldInstanceReady` 不在 prelude | 要 `use bevy::world_serialization::WorldInstanceReady`。另注意 `WorldAssetRoot` 装的是 `Handle<WorldAsset>`，旧名 `SceneRoot` | 028 |
-| 环境光 0.19 改名 | `GlobalAmbientLight` 是**资源**（全局默认）；`AmbientLight` 现在是挂相机上覆盖用的**组件** | 027 |
+| `WorldInstanceReady` 不在 prelude | 要 `use bevy::world_serialization::WorldInstanceReady`。另注意 `WorldAssetRoot` 装的是 `Handle<WorldAsset>` | 028 |
+| 环境光 | `GlobalAmbientLight` 是**资源**（全局默认）；`AmbientLight` 现在是挂相机上覆盖用的**组件** | 027 |
 | 光源开阴影的字段名 | `shadow_maps_enabled`（旧版叫 `shadows_enabled`） | 027 |
-| 自定义 shader 运行时校验失败 | `@group` 编号**不能写死**。0.19 里材质 bind group 由引擎按特性动态决定并注入，须写 `@group(#{MATERIAL_BIND_GROUP})`。写死 `2` 会撞到 storage buffer，报 `ResourceBinding { group: 2, binding: 0 } is not available in the pipeline layout` 并 `Quitting the application due to Validation RenderError` | 030 |
+| 自定义 shader 运行时校验失败 | `@group` 编号**不能写死**。材质 bind group 由引擎按启用的特性动态决定并注入，必须写 `@group(constants::MATERIAL_BIND_GROUP)`（WESL 语法）。写死 `2` 会撞到别的绑定，报 `Shader global ResourceBinding { group: 2, binding: 0 } is not available in the pipeline layout` | 030 |
 | 自定义材质什么都不显示也不报错 | 忘了 `MaterialPlugin::<M>::default()` | 030 |
-> 以下三条是**升级到 0.20 后重新实测**得到的，与 0.19 时的结论不同：
 
-| 0.20 实测行为 | 说明 | 影响讲次 |
 | --- | --- | --- |
-| `Time<Virtual>` 的倍速与上限顺序变了 | 0.19 是「先把真实帧长裁剪到 `max_delta`，再乘倍速」；**0.20 反过来**：先乘倍速、再裁剪到 `DEFAULT_MAX_DELTA = 250ms`（`bevy_time-0.20.0/src/virt.rs:249`）。所以真实帧长 100ms + `set_relative_speed(3.0)` 现在只得到 **250.0ms 封顶（≈2.5 倍）**，不再是 ~300ms。想要真正的 3 倍得自己调大 `set_max_delta` | 010 |
-| 缺资源的 panic **形态变了** | 仍会 panic（`FallbackErrorHandler` 默认 `match_severity` 即重新 panic），但：① panic 打在 **TaskPool 工作线程**上而不再是 `main`；② **同一 Schedule 里其余系统仍会跑完**，最后才以退出码 101 结束；③ 源头是 `bevy_ecs-0.20.0/src/error/handler.rs:128`。这对将来用 `#[should_panic]` 写测试的 032 有实际影响 | 006 / 009 / 032 |
-| `App::add_event` 在 0.20 **已不存在** | 全量源码 grep 确认（只剩 `bevy_animation` 里一个同名无关方法）。0.19 起事件已经分成 message / event / entity-event 三类，注册分别用 `add_message` / `add_event`（自定义全局事件）—— 老的 `add_event::<T>()` 名字不再对应"消息"。照着老教程写会直接编译不过 | 012 / 016 |
+| `Time<Virtual>` 的倍速有 250ms 上限 | 先乘倍速、再裁剪到 `DEFAULT_MAX_DELTA = 250ms`（`bevy_time-0.20.0/src/virt.rs:249`）。所以真实帧长 100ms + `set_relative_speed(3.0)` 实际只得到 **250.0ms（≈2.5 倍）**，不是 300ms。想要真正的 3 倍得自己调大 `set_max_delta` | 010 |
+| 缺资源 panic 的表现 | 会 panic（`FallbackErrorHandler` 默认 `match_severity` 即重新 panic）：① panic 打在 **TaskPool 工作线程**上而不是 `main`；② **同一 Schedule 里其余系统仍会跑完**，最后才以退出码 101 结束；③ 源头是 `bevy_ecs-0.20.0/src/error/handler.rs:128`。这对用 `#[should_panic]` 写测试的 032 有实际影响 | 006 / 009 / 032 |
+| `App::add_event` 不存在 | 事件分成 message / event / entity-event 三类，注册分别用 `add_message` / `add_event`（自定义全局事件）/ 观察者。`add_event::<T>()` 这个名字对应的是**自定义全局事件**，不是消息 —— 想注册消息要用 `add_message` | 012 / 016 |
 | `TimerMode::Once` + `is_finished()` | 到点后**每帧都为真**（并非只在到点那一帧），拿它做"触发一次"会变成每帧触发；要用 `just_finished()` | 010 |
 
 两条相关取舍：
@@ -474,18 +472,16 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 >   因为时间与消息都是**跨帧**机制，帧长不可控就看不清。
 > - `010_time.rs` 落地了 `Timer` 的三种驱动写法（手动累加 / 资源 / 组件）对照，
 >   并用"前 5 帧 100ms、后 5 帧 50ms"实测出帧率相关写法的 33% 误差。
-> - `010` 初版让 `Time<Virtual>` 只出现在注释里（因为它需要 `TimePlugin`，
->   而该插件会覆盖手动推进的时间）；返工时已把它提升为**现场演示**，
->   办法是分成两段、两个 App —— 一段精确控时，一段用插件。
+> - `010` 把 `Time<Virtual>` 做成**现场演示**。难点在于它需要 `TimePlugin`，
+>   而该插件会覆盖手动推进的时间，办法是分成两段、两个 App ——
+>   一段精确控时，一段用插件。
 > - `011_input.rs` 把经典 bug 量化了。实测（固定 60 帧 × 1/60 秒）：
 >   `just_pressed` 触发 **1** 次、`pressed` 触发 **60** 次 —— 那个 60 就是帧率。
 > - `012_message.rs` 实测纠正了一条流传很广的说法：
 >   **Bevy 并不会自动把 `MessageWriter` 排在 `MessageReader` 之前**。
 >   同帧同类型的两个读者，有序的读到本帧、无序的读到上一帧。消息**只活两帧**。
-> - **返工记录（010 / 011）**：初版把"移动方块 / 射击冷却"当成了主线，本讲自己的 API 反倒靠边。
->   按"每讲只服务本讲主题"改写：010 去掉移动演示、把虚拟时钟提为现场演示；
->   011 去掉移动与射击叙事、把五种输入资源与两类形态全做成演示。
->   相应地补了规划原则第 8 条，010 / 011 的讲次规格也已改写。
+> - 010 / 011 按"每讲只服务本讲主题"处理：010 不做移动演示、把虚拟时钟提为现场演示；
+>   011 不做移动与射击叙事、把五种输入资源与两类形态全做成演示。
 
 > 阶段三（013–015）的实施备注：
 > - 013 用两帧输出同时证明了四件事：**生命周期事件自动触发**（`On<Add, Health>`，没写 trigger）、
@@ -502,17 +498,17 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 >   它是层级的能力，放进 013 会抢戏（规划原则第 8 条），故留在文末说明并指向 014。
 
 > 阶段四（016–019）的实施备注：
-> - 016 初版漏了跨插件的顺序声明，结果 `Score = 20` **加了却永远没打印出来**
->   （整个演示只有 3 帧，错过就没了）。修法是引入 `GameSet` + `configure_sets`
->   集中声明组间顺序 —— 这正好把 `SystemSet` 从"004 里提过一句"提升为**插件的必要配套**。
-> - 017 是本项目唯一的**目录式 example**，此前无法确认该模式在本仓库可行。
->   实施时已实测：`cargo metadata` 显示 `017_module` 的来源是
+> - 016 用 `GameSet` + `configure_sets` 集中声明跨插件的组间顺序。少了它，
+>   那一帧加的 `Score = 20` **加了却永远不会被打印出来**（整个演示只有 3 帧，
+>   错过就没了）—— 这正好把 `SystemSet` 从"004 里提过一句"提升为**插件的必要配套**。
+> - 017 是本项目唯一的**目录式 example**。已实测：
+>   `cargo metadata` 显示 `017_module` 的来源是
 >   `examples/017_module/main.rs`，同级子模块未被识别为独立目标。
 >   017 的输出与 016 **逐字相同** —— 这正是本讲要证明的"只是搬了家"。
 > - 018 用计时器自动循环三个状态（不依赖输入），并明确了三条最容易搞混的规则：
 >   `set()` 是请求不是执行、`OnEnter`/`OnExit` 只跑一次、状态是资源不是组件。
 >   实测还发现 **`init_state` 也会触发一次 `OnEnter`**，已写进例子。
-> - 019 实测踩到两个坑，都写进了例子：① 状态机需要 `StatesPlugin`，
+> - 019 有两个坑写进了例子：① 状态机需要 `StatesPlugin`，
 >   只用 `LogPlugin` 会在 `init_state` 处 panic；② 读子状态必须用
 >   `Option<Res<State<..>>>`，因为父状态不满足时它**整个不存在**。
 >   另外状态切换在帧末生效，所以本讲用了 6 帧而不是 5 帧，否则看不到
@@ -523,12 +519,12 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 > - 本阶段第一次需要 `assets/`。按规划采用**全程序化生成**：新增 `tools/make_assets.py`
 >   （用捆绑的 Python + Pillow）生成 `logo.png` 与 6 帧雪碧图 `runner.png`。
 >   音频素材最终**没有生成** —— 原因见下。
-> - 实测纠正了三处会导致"照着写跑不起来"的认知，都已写进例子与 4.5：
->   ① **`assets/` 的根会回落到可执行文件目录**，直接跑 exe 必然加载失败（本讲开发时踩到）；
->   ② **`file_watcher` 不在默认 feature**，热重载在本项目根本不生效
->      （初版误以为它是默认开启的，已更正）；
->   ③ **默认音频只支持 OGG**，播 WAV 会直接 panic，而 `wav` / `file_watcher`
->      所需的额外依赖在本机无法下载。
+> - 三点会导致"照着写跑不起来"的事实，都已写进例子与 4.5：
+>   ① **`assets/` 的根会回落到可执行文件目录**，直接跑 exe 必然加载失败；
+>   ② **`file_watcher` 不在默认 feature 里**（属 `dev` 组）——
+>      本项目开了 `dev`，所以热重载是生效的；
+>   ③ **默认音频只支持 OGG**，播 WAV 会直接 panic，
+>      而 `wav` 所需的额外依赖在本机无法下载。
 > - 024 因此**改用 `Pitch` 程序合成音**：不需要音频文件、不需要额外 feature，
 >   反而把"频率"这个参数暴露出来，比文件名更能说明 `AudioPlayer` 在播什么。
 >   文件播放的正确姿势（转 OGG）写在文末。
@@ -537,21 +533,22 @@ C:\Users\Sycamore\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy-0.20
 > - 025 是本阶段唯一"没有输入也能看"的一讲：用 `Viewport` 把同一份世界画在左右两半，
 >   左相机可滚轮缩放 —— 一眼看出 `scale` 是"视野倍数"而不是"物体倍数"。
 > 阶段六（027–030）的实施备注：
-> - 本轮又纠正了四处会让"照着老教程写跑不起来"的 0.19 变更，全部写进例子与 4.5：
+> - 四处会让"照着老教程写跑不起来"的地方，都已写进例子与 4.5：
 >   ① 环境光拆成 `GlobalAmbientLight`（资源）+ `AmbientLight`（组件）；
->   ② 光源阴影字段改名 `shadow_maps_enabled`；
->   ③ **glTF 的节点与网格是两个实体**（本讲第一版按节点名改材质，静默失败，
->      跑起来看输出才发现）；
->   ④ **WGSL 里材质 bind group 的编号不能写死** —— 初版写 `@group(2)`，
->      编译正常但一跑就 `Validation Error` 并退出。引擎自己的 `pbr_bindings.wgsl`
->      用的是预处理器变量 `#{MATERIAL_BIND_GROUP}`，跟着改才对。
+>   ② 光源阴影字段是 `shadow_maps_enabled`；
+>   ③ **glTF 的节点与网格是两个实体** —— 按节点名改材质会**静默失败**，
+>      跑起来看输出才发现；
+>   ④ **shader 里材质 bind group 的编号不能写死** —— 写成 `@group(2)`
+>      编译正常、一跑就报管线校验错误并退出；要用引擎给的常量
+>      `@group(constants::MATERIAL_BIND_GROUP)`。
 > - 028 的 glTF 素材由 `make_pyramid_gltf()` **手写生成**（三节点树、18 顶点、
 >   6 三角形、base64 内嵌 432 字节缓冲），不依赖任何 3D 工具 ——
 >   顺带把顶点、法线、绕序这些平时被工具藏起来的东西摊开了。
->   glTF 动画**未现场演示**：0.19 播动画还需 `AnimationGraphHandle`（一套动画图），
+>   glTF 动画**未现场演示**：播动画还需 `AnimationGraphHandle`（一套动画图），
 >   主体是"动画系统"而非"加载 glTF"，按原则第 8 条留给后续；
 >   素材里也没有动画，注意力集中在"场景 = 实体树"。
 > - 029 的交互部分**机器验证不了**（需要真实鼠标），已如实标注；但"不加插件会静默失效"
 >   这一条用 A/B（临时注释插件行）实测确认了 stderr 为空。
-> - 030 的热重载**在本项目不可用**（`file_watcher` 属 `dev` 组、开启需下载依赖），
->   文末已如实说明，并给出 `embedded_asset!` 的替代路径。
+> - 030 的热重载已实测可用（本项目开了 `dev`，其中含 `file_watcher`）：
+>   跑起来后改 `assets/shaders/glow.wesl` 存盘，画面几帧内就会变。
+>   另一种做法是 `embedded_asset!` 把 WESL 编进二进制（发布常用，代价是没有热重载）。

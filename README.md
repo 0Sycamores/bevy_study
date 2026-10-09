@@ -216,7 +216,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
 - **要点**：
   - **取数方式对照**：`iter()` / `iter_mut()` / `par_iter_mut()` / `single()`（返回 `Result`）/ `get(entity)` / `iter_many()`，
     以及三个「取不到就不跑系统」的参数：`Single` / `Option<Single>` / `Populated`。
-  - **取不到数据时 Bevy 的三种反应（0.20 实测，见 CURRICULUM 4.5 表）**：
+  - **取不到数据时 Bevy 的三种反应（实测，见 CURRICULUM 4.5 表）**：
     1. `Query` 命中 0 个 → 完全正常，系统照常运行，`iter().count()` 得 0；
     2. `Single` / `Option<Single>` / `Populated` 条件不满足 → **静默跳过整个系统**（不打印、不报错、不 panic）；
     3. 缺 `Res<T>`（资源压根没注册）→ **直接 panic**，报 `Resource does not exist`，并提示用 `Option<Res<T>>` 或 `If<Res<T>>`。
@@ -442,7 +442,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   ```
 - **要点**：
   - `Plugin::build` 里能做的，就是你在 `main` 里能做的一切 —— **插件不是新概念，只是把一段配置搬了个家**（从"堆在 main 里"变成"归属于某个功能模块"）。
-  - **`SystemSet` 是插件的必要配套**：插件之间同样要声明顺序。本讲那句 `GameSet::Score.after(GameSet::Enemy)` 是集中声明的跨插件约束；**不写的话，那一帧加的 `Score = 20` 永远不会被打印出来**（初版实测就是这么丢的）。
+  - **`SystemSet` 是插件的必要配套**：插件之间同样要声明顺序。本讲那句 `GameSet::Score.after(GameSet::Enemy)` 是集中声明的跨插件约束；**不写的话，那一帧加的 `Score = 20` 永远不会被打印出来**（实测确实会丢）。
   - 插件之间靠**共享资源 / 消息 / 事件**协作，不是互相调用 —— 代价是"谁拥有 `Score`"成了需要约定的问题，所以要在注释里写清归属。
   - `PluginGroup` + `PluginGroupBuilder` 把多个插件打包；`DefaultPlugins.set(..)` / `.disable::<T>()` / `.add_before::<T>(..)` 用来定制引擎自带的插件组。
   - 拆插件的判断标准：**如果你要为这组东西起个名词（"敌人"、"分数"、"音频"），它多半就该是个插件。**
@@ -646,7 +646,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   - 3D 物体三件套：`Mesh3d`（形状）+ `MeshMaterial3d`（表面）+ `Transform`，两者都是**句柄** → 多个物体可共用一份网格/材质。
   - ⚠️ 缺必需组件**不报错，只是看不见**（和 003 的"窗口 ≠ 画面"同类）。
   - 相机姿态用 `looking_at(目标, 上方向)`；那个 `up` 不能省 —— 只给"看哪里"确定不了姿态（相机还能绕视线自转）。
-  - ⚠️ 两处改名（0.19 起）：环境光资源是 **`GlobalAmbientLight`**（`AmbientLight` 现在是挂相机上覆盖用的**组件**）；光源开阴影的字段是 **`shadow_maps_enabled`**（旧版 `shadows_enabled`）。
+  - ⚠️ 两处容易写错的名字：环境光资源是 **`GlobalAmbientLight`**（`AmbientLight` 是挂相机上覆盖用的**组件**）；光源开阴影的字段是 **`shadow_maps_enabled`**（写成 `shadows_enabled` 编译不过）。
   - 相机朝向那个数可以自己算：`looking_at` 的方向就是**目标 − 位置**归一化。相机在 x=−4.5 看原点，所以 x 分量是**正**的。
 
 ---
@@ -703,7 +703,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
   ```
 - **要点**：
   - Rust 侧：`#[derive(Asset, TypePath, AsBindGroup)]` + `#[uniform(N)]` 字段 + `impl Material { fn fragment_shader() -> ShaderRef }`，注册用 `MaterialPlugin::<M>::default()`。
-  - ★ **`@group` 的编号不能写死** —— 这是本讲最大的坑。初版按老写法写 `@group(2)`，编译正常、**一跑就炸**：
+  - ★ **`@group` 的编号不能写死** —— 这是本讲最大的坑。写成 `@group(2)` 编译正常、**一跑就炸**：
 
     ```text
     Validation Error: Shader global ResourceBinding { group: 2, binding: 0 }
@@ -712,7 +712,7 @@ WARN bevy_ecs::schedule::schedule: Update schedule built successfully, however:
     Quitting the application due to Validation RenderError
     ```
 
-    材质 bind group 的编号由引擎按启用的特性**动态决定**并注入，所以不能写死。0.20 换了 shader 语言（WESL）后写法变了，但道理一样 —— 要用引擎给的常量：`@group(constants::MATERIAL_BIND_GROUP)`（看 `pbr_bindings.wesl`）。**凡和管线布局有关的编号，优先找引擎的常量，别抄字面量。**
+    材质 bind group 的编号由引擎按启用的特性**动态决定**并注入，所以不能写死 —— 要用引擎给的常量：`@group(constants::MATERIAL_BIND_GROUP)`（见 `bevy_pbr/src/render/pbr_bindings.wesl`）。**凡和管线布局有关的编号，优先找引擎的常量，别抄字面量。**
   - ⚠️ **忘了 `MaterialPlugin`** → 编译能过、程序能跑、日志干净，就是**画面上什么都没有**。
   - Rust 与 WGSL 是**两份要手动对齐的契约**（类型、binding 号、`#import` 路径），对不上大多是**运行时**才暴露。调试顺序：先看终端有没有 shader 校验错误 → 再确认插件装了没 → 最后把 fragment 改成返回纯品红，能看见就说明管线通了。
   - ⚠️ **热重载在本项目不可用**（`file_watcher` 在 `dev` 组里、不在默认，且开启要下载依赖），所以改 shader 必须重新 `cargo run`。另一种做法是 `embedded_asset!` 把 WGSL 编进二进制（发布常用，代价是彻底没有热重载）。
