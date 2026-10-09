@@ -4,8 +4,8 @@
 //!
 //! 新增概念
 //!   MeshPickingPlugin      **必须手动添加**：它给 3D 网格装上"可被指针选中"的能力
-//!   Pointer<Over/Out>      指针移入 / 移出某个网格
-//!   Pointer<Click>         在同一个网格上完成按下 + 松开
+//!   PointerOver / PointerOut   指针移入 / 移出某个网格
+//!   PointerClick          在同一个网格上完成按下 + 松开
 //!   轨道相机               右键拖动绕焦点旋转、滚轮拉近拉远
 //!
 //! 使用场景
@@ -144,7 +144,7 @@ fn setup(
 }
 
 /// 指针移入：换成高亮材质。
-fn on_over(over: On<Pointer<Over>>, mut commands: Commands, highlights: Query<&Highlight>) {
+fn on_over(over: On<PointerOver>, mut commands: Commands, highlights: Query<&Highlight>) {
     if let Ok(highlight) = highlights.get(over.entity) {
         // 直接改组件即可 —— `MeshMaterial3d` 就是"当前用哪份材质"
         commands
@@ -155,7 +155,7 @@ fn on_over(over: On<Pointer<Over>>, mut commands: Commands, highlights: Query<&H
 }
 
 /// 指针移出：还原。
-fn on_out(out: On<Pointer<Out>>, mut commands: Commands, highlights: Query<&Highlight>) {
+fn on_out(out: On<PointerOut>, mut commands: Commands, highlights: Query<&Highlight>) {
     if let Ok(highlight) = highlights.get(out.entity) {
         commands
             .entity(out.entity)
@@ -164,7 +164,7 @@ fn on_out(out: On<Pointer<Out>>, mut commands: Commands, highlights: Query<&High
 }
 
 /// 点击：打印它的名字，并把材质换成高亮色留住（表示"已选中"）。
-fn on_click(click: On<Pointer<Click>>, names: Query<&Name>) {
+fn on_click(click: On<PointerClick>, names: Query<&Name>) {
     let name = names.get(click.entity).map_or("<无名>", Name::as_str);
     println!("   [Click] 选中了「{name}」");
 }
@@ -241,7 +241,7 @@ fn orbit_camera(
 //   1. 把屏幕坐标换算成一条**世界空间的射线**（就是 `viewport_to_world`）
 //   2. 拿这条射线去和所有可拾取网格求交（用它们的变换 + 网格包围体加速）
 //   3. 取最近的交点，确定"打中了哪个实体"
-//   4. 生成 `Pointer<Over>` / `Pointer<Click>` 等事件，**目标是那个实体**
+//   4. 生成 `PointerOver` / `PointerClick` 等事件，**目标是那个实体**
 //
 // 所以你不用自己写射线代码 —— 这正是 013 讲的"实体事件"最适合的场景：
 // 事件自带目标，观察者挂在谁身上就只管谁。

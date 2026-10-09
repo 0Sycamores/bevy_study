@@ -7,7 +7,7 @@
 //!   On<E>              观察者系统的参数，能拿到事件数据与 `on.entity`
 //!   observe / add_observer   把观察者挂在**某一个实体**上 / 挂成**全局**的
 //!   trigger            触发事件：`commands.trigger(..)`
-//!   生命周期事件       `On<Add, T>` / `On<Remove, T>` —— 组件增删时自动触发
+//!   生命周期事件       `On<Add<T>>` / `On<Remove<T>>` —— 组件增删时自动触发
 //!
 //! 使用场景
 //!   某个实体出了事、只有关心它的那几个人要响应：被击中、被拾取、血条归零
@@ -108,8 +108,8 @@ fn on_hit_this_entity(hit: On<Hit>) {
     let _ = hit.entity;
 }
 
-/// 生命周期事件：`On<Add, T>` 在组件被**加上**时自动触发，不用手动 trigger。
-fn on_health_added(add: On<Add, Health>) {
+/// 生命周期事件：`On<Add<T>>` 在组件被**加上**时自动触发，不用手动 trigger。
+fn on_health_added(add: On<Add<Health>>) {
     println!("   [生命周期] 有实体被加上了 Health（{:?}）", add.entity);
 }
 
@@ -143,7 +143,7 @@ fn name_of(enemies: &Query<&Enemy>, entity: Entity) -> &'static str {
 // 1. **全局观察者**：`app.add_observer(sys)` —— 所有同类事件都跑。
 // 2. **实体专属观察者**：`commands.spawn(..).observe(sys)` —— 只监听那一个实体。
 //    这正是 `EntityEvent` 存在的意义：事件带着 `entity`，才能"点名"。
-// 3. **生命周期事件**：`On<Add, T>` / `On<Remove, T>`，组件增删时**自动**触发，
+// 3. **生命周期事件**：`On<Add<T>>` / `On<Remove<T>>`，组件增删时**自动**触发，
 //    不需要你写 `trigger`。`Add` 在组件被加上时、`Remove` 在被移除时
 //    （`despawn` 也算移除）各触发一次。
 // 4. **链式反应**：观察者里可以再 `trigger` 别的事件（上面血量归零 → `Died`），
@@ -206,7 +206,7 @@ fn name_of(enemies: &Query<&Enemy>, entity: Entity) -> &'static str {
 //
 // 四个结论都能从输出里读出来：
 //
-// 1. **生命周期事件不用手动触发**：第 1 帧开头那三行 `On<Add, Health>` 是三个敌人
+// 1. **生命周期事件不用手动触发**：第 1 帧开头那三行 `On<Add<Health>>` 是三个敌人
 //    生成时自动跑的 —— 注意它们出现在 `[触发]` 之前，因为 `Startup` 跑完就有一个
 //    同步点，命令（含 spawn）在那里落地。
 // 2. **精准投递**：`[专属观察者]` 只在**敌人A** 被击中时出现，敌人B 那次没有。
@@ -228,7 +228,7 @@ fn name_of(enemies: &Query<&Enemy>, entity: Entity) -> &'static str {
 //   app.add_observer(sys)                                    全局观察者
 //   commands.spawn(..).observe(sys)                          只监听这个实体
 //   On<E>                                                    观察者参数：事件数据 + .entity
-//   On<Add, T> / On<Remove, T>                               组件增删时自动触发
+//   On<Add<T>> / On<Remove<T>>                               组件增删时自动触发
 //   sys.run_if(..)                                           观察者也能带运行条件
 //
 // 不在 prelude 里的：`EntityEvent` 的派生宏来自 `bevy::ecs::event`，但**通常不用手写 use** ——

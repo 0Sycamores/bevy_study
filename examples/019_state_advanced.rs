@@ -68,7 +68,6 @@ enum AppState {
 /// 它不存在，而不是"存在但无意义"。
 #[derive(SubStates, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 #[source(AppState = AppState::Playing)]
-#[states(scoped_entities)]
 enum IsPaused {
     #[default]
     Running,
