@@ -226,19 +226,20 @@ fn watch_asset_events(mut events: MessageReader<AssetEvent<Image>>, logo: Res<Lo
 // **热重载**：运行中改 `assets/textures/logo.png`，画面会在几帧内自动更新 ——
 // 但**前提是开启 `file_watcher` feature**。
 //
-// ⚠️ 实测更正：`file_watcher` **不是**默认 feature。它属于 `dev` 特性组：
+// ⚠️ 注意 `file_watcher` **不是**默认 feature，它属于 `dev` 特性组：
 //
-//     default = ["2d", "3d", "ui", "audio"]                 ← 只有这四个
+//     default = ["2d", "3d", "ui", "audio"]                  ← 只有这几个
 //     dev     = ["debug", "bevy_dev_tools", "file_watcher"]  ← 热重载在这里
-//               （以上取自 bevy 0.19.1 的 Cargo.toml）
 //
-// 本项目**没有**开它，所以直接改 PNG 是**不会**触发热重载的 ——
-// 本讲实测确认过：改完等 10 秒，既没有 `[AssetEvent] Modified`，画面也不变。
-// （开启它需要额外下载 `notify-debouncer-full` 依赖，本机网络不可用。）
+// **本项目已经开了 `dev`**：
 //
-// 想用就在 `Cargo.toml` 里开：
+//     bevy = { version = "0.20", features = ["dev"] }
 //
-//     bevy = { version = "0.19.1", features = ["dev"] }
+// 所以热重载是**生效**的 —— 本讲实测：运行中改 PNG，几秒内就打出
+// `[AssetEvent] Modified`，画面同步更新。
+//
+// 如果你的项目没开 `dev`，改素材不会触发任何更新；那时要么加上这个 feature，
+// 要么每次重启程序。
 //
 // 建议开 `dev` 而不是只开 `file_watcher`，因为它一次给三样东西：
 //   · `file_watcher`    —— 热重载（改素材不用重启）

@@ -3,15 +3,15 @@
 //! 运行：`cargo run --example 030_shader`
 //!
 //! 新增概念
-//!   Material trait       自定义材质：告诉引擎"用哪个 WGSL 来画"
-//!   AsBindGroup          声明"哪些 Rust 数据要传给 shader"（binding 号要对上 WGSL）
+//!   Material trait       自定义材质：告诉引擎"用哪个 WESL 着色器来画"
+//!   AsBindGroup          声明"哪些 Rust 数据要传给 shader"（binding 号要跟 shader 对上）
 //!   MaterialPlugin::<M>  注册材质类型 —— **不注册等于没写**
 //!   ShaderRef            去哪找 shader（路径相对 `assets/`）
 //!
 //! 使用场景
 //!   引擎自带材质不够用时：描边、水波、溶解、全息、卡通渲染
 //!
-//! 注意：Rust 侧与 WGSL 侧是**两份必须手动对齐的契约** —— 类型、binding 号、
+//! 注意：Rust 侧与 WESL 侧是**两份必须手动对齐的契约** —— 类型、binding 号、
 //!       结构体布局任何一处对不上，都是**运行时**才炸（画面变黑），编译期查不出来
 
 use bevy::prelude::*;
@@ -20,7 +20,7 @@ use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
 
 /// shader 文件相对 `assets/` 的路径。
-const SHADER_PATH: &str = "shaders/glow.wgsl";
+const SHADER_PATH: &str = "shaders/glow.wesl";
 
 fn main() {
     App::new()
@@ -56,7 +56,7 @@ fn main() {
 /// 自动生成"把这些数据打包上传到 GPU"的代码。
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct GlowMaterial {
-    // ⚠️ N 必须和 WGSL 里的 `@binding(N)` 对上
+    // ⚠️ N 必须和 WESL 里的 `@binding(N)` 对上
     #[uniform(0)]
     base_color: Vec4,
 
@@ -159,7 +159,7 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 // 控制台输出：
 //
 //   ── 自定义材质 GlowMaterial 已注册（MaterialPlugin）
-//      shader 来自 shaders/glow.wgsl；三个物体用条纹 + 呼吸着色
+//      shader 来自 shaders/glow.wesl；三个物体用条纹 + 呼吸着色
 //
 // ─────────────────────────────────────────────────────────────────────
 // ★ 两处"不报错但没效果"的坑（本讲最容易踩的）
@@ -168,17 +168,17 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 //    材质类型没注册进渲染管线。程序照常跑、日志干干净净，
 //    就是**画面上什么都不显示**。
 //
-// ② **Rust 与 WGSL 对不上**
+// ② **Rust 与 WESL 对不上**
 //    binding 号写岔了、类型不匹配、`#import` 路径写错 —— 这些都是
 //    **运行时**才报错（naga 编译 shader 失败），表现同样是画面变黑。
 //    终端里能看到形如 `Shader validation error` 的日志。
 //
-// 这两条的根源是同一个：**Rust 侧和 WGSL 侧是两份独立的契约，
+// 这两条的根源是同一个：**Rust 侧和 WESL 侧是两份独立的契约，
 // 没有编译器替你对齐**。Bevy 尽量在启动时校验，但很多问题只有真正
 // 画到屏幕上才暴露。
 //
 // 所以写自定义着色器的调试顺序建议是：
-//   1. 先看终端有没有 shader 编译错误（有就直接改 WGSL）
+//   1. 先看终端有没有 shader 编译错误（有就直接改 WESL）
 //   2. 没有的话，确认 `MaterialPlugin` 装了没
 //   3. 还不行，把 fragment 改成 `return vec4(1.0, 0.0, 1.0, 1.0)`
 //      （纯品红）—— 能看见就说明管线通了，问题在计算逻辑里
@@ -200,15 +200,15 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 //
 // 原因是 0.19 里材质 bind group 的**编号不是固定的**：引擎会根据启用的特性
 // （bindless 之类）动态决定，再通过预处理器变量注入。看引擎自己的
-// `pbr_bindings.wgsl` 就能发现它一个数字都没写死：
+// `pbr_bindings.wesl` 就能发现它一个数字都没写死：
 //
-//     @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> material: StandardMaterial;
+//     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: StandardMaterial;
 //
 // 所以正确写法是**让引擎来填这个数**：
 //
-//     @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> base_color: vec4<f32>;
+//     @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> base_color: vec4<f32>;
 //
-// 记住这条：**WGSL 里凡是和管线布局有关的编号，优先找引擎的预处理器变量**，
+// 记住这条：**shader 里凡是和管线布局有关的编号，优先找引擎的常量**，
 // 别照抄示例里的字面量 —— 那些数字在版本之间会变。
 //
 // ─────────────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 //
 //   `@group(0)`  视图级：相机矩阵、光照、环境贴图（引擎管）
 //   `@group(1)`  网格级：模型矩阵、骨骼、形变（引擎管）
-//   材质级       **你自己声明的数据** —— 编号用 `#{MATERIAL_BIND_GROUP}`
+//   材质级       **你自己声明的数据** —— 编号用 `constants::MATERIAL_BIND_GROUP`
 //
 // 需要更多材质数据时，`AsBindGroup` 支持的类型不止 uniform：
 //
@@ -226,34 +226,35 @@ fn pulse_materials(time: Res<Time>, mut materials: ResMut<Assets<GlowMaterial>>)
 //   #[storage(3, read_only)]  存储缓冲（大量数据，比如每个实例一份参数）
 //
 // 每个字段占一个 binding 号，**编号不要跳着写** —— 跳号本身合法，
-// 但很容易和 WGSL 对不上，是上面②那类 bug 的高发区。
+// 但很容易和 WESL 对不上，是上面②那类 bug 的高发区。
 //
 // 两个 uniform 都用 `vec4<f32>` 而不是把 `f32` 单独绑一个 binding：
 // uniform 缓冲有 16 字节对齐要求，塞进 vec4 最省心，不用算 padding。
 // （本讲只用 `params.x`，另外三个分量留着备用。）
 //
 // ─────────────────────────────────────────────────────────────────────
-// ⚠️ 热重载在本项目**不可用**
+// ✅ 热重载（本项目已开 `dev`，所以可用）
 //
-// 通常写 shader 最爽的一点是"改 WGSL 存盘、画面立刻更新，不用重编译 Rust"，
-// 但这需要 `file_watcher` feature —— 它属于 `dev` 特性组（`default` 里没有），
-// 开启还需要额外下载依赖，本项目的环境装不了（详见 020 讲的说明）。
+// 写 shader 最爽的一点是"改 WESL 存盘、画面立刻更新，不用重编译 Rust"。
+// 这需要 `file_watcher` feature —— 它属于 `dev` 特性组（`default` 里没有），
+// 而本项目的 Cargo.toml 已经开了 `dev`，所以它是生效的：
 //
-// 所以本讲改 shader 之后**必须重新 `cargo run`**。
-// 在能开 `file_watcher` 的环境里，只要 `cargo run` 起来之后改
-// `assets/shaders/glow.wgsl` 存盘，画面几帧内就会变 —— 调 shader 效率高很多。
+//     bevy = { version = "0.20", features = ["dev"] }
 //
-// 另一种做法是 `embedded_asset!(app, "glow.wgsl")`：把 WGSL **编进二进制**，
+// 跑起来之后改 `assets/shaders/glow.wesl` 存盘，画面几帧内就会变 ——
+// 调 shader 效率高很多（详见 020 讲的说明）。
+//
+// 另一种做法是 `embedded_asset!(app, "glow.wesl")`：把 WESL **编进二进制**，
 // 不依赖 `assets/` 目录、也不会因为路径找不到而失败，代价是彻底没有热重载
 // （改一次就得重编译）。发布时常用这种。
 //
 // ─────────────────────────────────────────────────────────────────────
 // shader 文件的归属
 //
-// `assets/shaders/glow.wgsl` 和 `assets/` 下别的文件性质不同：
+// `assets/shaders/glow.wesl` 和 `assets/` 下别的文件性质不同：
 //
 //   `assets/textures/*.png`、`assets/models/*.gltf`   由 `tools/make_assets.py` **生成**
-//   `assets/shaders/glow.wgsl`                        是**手写的源码**
+//   `assets/shaders/glow.wesl`                        是**手写的源码**
 //
 // 所以跑素材脚本不会覆盖它，它应当随源码一起进版本库。
 // 把它放在 `assets/` 下是因为 `ShaderRef::path(..)` 的路径基准就是 `assets/`。
